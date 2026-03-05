@@ -45,6 +45,7 @@ export default function RecordingsPage() {
   const [showRecordingModal, setShowRecordingModal] = useState(false);
   const [playingId, setPlayingId] = useState<number | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
   const audioPlayersRef = useRef<{ [key: number]: HTMLAudioElement }>({});
 
   const { data: recordings = [], isLoading, refetch } = trpc.recordings.list.useQuery();
@@ -78,6 +79,8 @@ export default function RecordingsPage() {
   };
 
   const togglePlayback = (recordingId: number, audioUrl: string) => {
+    setPlaybackError(null);
+
     // Stop all other players
     Object.entries(audioPlayersRef.current).forEach(([id, player]) => {
       if (parseInt(id) !== recordingId) {
@@ -96,17 +99,23 @@ export default function RecordingsPage() {
       // Start playback
       let player = audioPlayersRef.current[recordingId];
       if (!player) {
-        player = new Audio(audioUrl);
+        player = new Audio();
         player.crossOrigin = 'anonymous';
         player.onended = () => setPlayingId(null);
         player.onerror = (e) => {
           console.error('Audio playback error:', e);
+          setPlaybackError(`재생 오류: ${audioUrl}`);
           setPlayingId(null);
         };
         audioPlayersRef.current[recordingId] = player;
       }
+      
+      // Set source and play
+      player.src = audioUrl;
       player.play().catch(err => {
         console.error('Failed to play audio:', err);
+        setPlaybackError(`재생 실패: ${err.message}`);
+        setPlayingId(null);
       });
       setPlayingId(recordingId);
     }
@@ -153,6 +162,17 @@ export default function RecordingsPage() {
           새 녹음
         </button>
       </div>
+
+      {/* Playback Error */}
+      {playbackError && (
+        <div className="p-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2">
+          <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs text-red-700 font-semibold">재생 오류</p>
+            <p className="text-xs text-red-600 mt-0.5">{playbackError}</p>
+          </div>
+        </div>
+      )}
 
       {/* Recordings List */}
       {isLoading ? (

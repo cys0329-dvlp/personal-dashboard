@@ -7,10 +7,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Mic, Square, Play, Pause, X, Upload, AlertCircle, HelpCircle, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface MediaRecorderErrorEvent extends Event {
-  error: string;
-}
-
 interface RecordingModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -111,8 +107,8 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: false, // Disable for better control
-          sampleRate: 48000, // Higher sample rate for better quality
+          autoGainControl: false,
+          sampleRate: 48000,
         }
       });
       
@@ -180,7 +176,7 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
         stream.getTracks().forEach(track => track.stop());
       };
 
-      mediaRecorder.start(100); // Collect data every 100ms for better reliability
+      mediaRecorder.start(100);
       setIsRecording(true);
       setRecordingTime(0);
 
@@ -233,15 +229,23 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
       setError('');
       const reader = new FileReader();
       reader.onload = async () => {
-        const base64 = (reader.result as string).split(',')[1];
-        await onSave({
-          title: title.trim(),
-          subject: subject.trim(),
-          description: description.trim(),
-          audioBase64: base64,
-          duration,
-        });
-        onClose();
+        const result = reader.result as string;
+        // Extract base64 part after the comma
+        const base64Data = result.includes(',') ? result.split(',')[1] : result;
+        
+        try {
+          await onSave({
+            title: title.trim(),
+            subject: subject.trim(),
+            description: description.trim(),
+            audioBase64: base64Data,
+            duration,
+          });
+          onClose();
+        } catch (err) {
+          setError('저장 중 오류가 발생했습니다.');
+          console.error('Save error:', err);
+        }
       };
       reader.onerror = () => {
         setError('파일 읽기 오류가 발생했습니다.');
@@ -472,4 +476,8 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
       </div>
     </div>
   );
+}
+
+interface MediaRecorderErrorEvent extends Event {
+  error: string;
 }
