@@ -1,38 +1,40 @@
+// ============================================================
+// App.tsx - Main application entry
+// Design: 웜 어스톤 생산성 대시보드
+// ============================================================
+
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
-import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import { DashboardProvider } from "./contexts/DashboardContext";
+import { useState } from "react";
+import Layout, { TabType } from "./components/Layout";
+import CalendarPage from "./pages/CalendarPage";
+import FinancePage from "./pages/FinancePage";
+import ProjectsPage from "./pages/ProjectsPage";
+import ErrorBoundary from "./components/ErrorBoundary";
 
+function DashboardApp() {
+  const [activeTab, setActiveTab] = useState<TabType>('calendar');
 
-function Router() {
   return (
-    <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
-    </Switch>
+    <Layout activeTab={activeTab} onTabChange={setActiveTab}>
+      {activeTab === 'calendar' && <CalendarPage />}
+      {activeTab === 'finance' && <FinancePage />}
+      {activeTab === 'projects' && <ProjectsPage />}
+    </Layout>
   );
 }
-
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
 
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="light">
         <TooltipProvider>
-          <Toaster />
-          <Router />
+          <DashboardProvider>
+            <Toaster />
+            <DashboardApp />
+          </DashboardProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
