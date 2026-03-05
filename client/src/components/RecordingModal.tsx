@@ -4,7 +4,7 @@
 // ============================================================
 
 import { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Play, Pause, X, Upload, AlertCircle } from 'lucide-react';
+import { Mic, Square, Play, Pause, X, Upload, AlertCircle, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface RecordingModalProps {
@@ -37,6 +37,7 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
   const [recordingTime, setRecordingTime] = useState(0);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [showPermissionHelp, setShowPermissionHelp] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -50,13 +51,44 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
       setRecordingTime(0);
       setError('');
       setIsPlaying(false);
+      setShowPermissionHelp(false);
     }
   }, [isOpen]);
+
+  const getPermissionErrorMessage = (err: any): string => {
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDismissedError') {
+      return '마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크 접근을 허용해주세요.';
+    }
+    if (err.name === 'NotFoundError') {
+      return '마이크를 찾을 수 없습니다. 마이크가 연결되어 있는지 확인해주세요.';
+    }
+    if (err.name === 'NotReadableError') {
+      return '마이크를 사용할 수 없습니다. 다른 앱에서 마이크를 사용 중일 수 있습니다.';
+    }
+    if (err.name === 'SecurityError') {
+      return 'HTTPS 연결이 필요합니다. 안전한 연결을 사용해주세요.';
+    }
+    return `마이크 접근 오류: ${err.message || '알 수 없는 오류'}`;
+  };
 
   const startRecording = async () => {
     try {
       setError('');
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setShowPermissionHelp(false);
+      
+      // Check browser support
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError('이 브라우저는 음성 녹음을 지원하지 않습니다. Chrome, Firefox, Safari 최신 버전을 사용해주세요.');
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        }
+      });
       
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       mediaRecorderRef.current = mediaRecorder;
@@ -86,8 +118,10 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
       recordingIntervalRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
-    } catch (err) {
-      setError('마이크 접근 권한이 필요합니다.');
+    } catch (err: any) {
+      const errorMessage = getPermissionErrorMessage(err);
+      setError(errorMessage);
+      setShowPermissionHelp(err.name === 'NotAllowedError' || err.name === 'PermissionDismissedError');
       console.error('Recording error:', err);
     }
   };
@@ -289,9 +323,24 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
 
         {/* Error Message */}
         {error && (
-          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2">
-            <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-red-700">{error}</p>
+          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-red-700">{error}</p>
+            </div>
+            {showPermissionHelp && (
+              <div className="ml-6 space-y-1.5 text-xs text-red-600">
+                <p className="font-semibold flex items-center gap-1">
+                  <HelpCircle size={12} />
+                  마이크 권한 허용 방법:
+                </p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  <li>주소창 왼쪽의 자물쇠 아이콘 클릭</li>
+                  <li>"마이크" 항목을 "허용"으로 변경</li>
+                  <li>페이지 새로고침 후 다시 시도</li>
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
