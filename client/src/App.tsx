@@ -63,7 +63,6 @@ function DashboardApp() {
     <Layout activeTab={activeTab} onTabChange={setActiveTab} username={username} onLogout={handleLogout}>
       {activeTab === 'calendar' && <CalendarPage />}
       {activeTab === 'finance' && <FinancePage />}
-      {activeTab === 'categories' && <CategoriesPage />}
       {activeTab === 'projects' && <ProjectsPage />}
       {activeTab === 'lectures' && <LecturesPage />}
       {activeTab === 'recordings' && <RecordingsPage />}

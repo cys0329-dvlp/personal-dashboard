@@ -428,11 +428,13 @@ interface TaskFormProps {
 
 function TaskForm({ initial, onSave, onClose }: TaskFormProps) {
   const [title, setTitle] = useState(initial?.title || '');
+  const [dueDate, setDueDate] = useState(initial?.dueDate || today());
+  const [dueTime, setDueTime] = useState(initial?.dueTime || '09:00');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onSave({ title: title.trim(), projectId: initial?.projectId || '', completed: initial?.completed || false });
+    onSave({ title: title.trim(), projectId: initial?.projectId || '', completed: initial?.completed || false, dueDate, dueTime });
   };
 
   return (
@@ -455,6 +457,23 @@ function TaskForm({ initial, onSave, onClose }: TaskFormProps) {
               placeholder="할 일을 입력하세요" required autoFocus
               className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">날짜</label>
+              <input
+                type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">시간</label>
+              <input
+                type="time" value={dueTime} onChange={e => setDueTime(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
           </div>
 
           <div className="flex gap-2 pt-1">

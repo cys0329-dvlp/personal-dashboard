@@ -4,6 +4,7 @@ import { useDashboard } from '@/contexts/DashboardContext';
 import { cn } from '@/lib/utils';
 import { formatDisplayDate, today } from '@/lib/utils';
 import RecordingModal from '@/components/RecordingModal';
+import RecordingUploadModal from '@/components/RecordingUploadModal';
 
 interface Lecture {
   id: string;
@@ -214,6 +215,8 @@ export default function LecturesPage() {
   const [showLectureForm, setShowLectureForm] = useState(false);
   const [editingLecture, setEditingLecture] = useState<Lecture | null>(null);
   const [showRecordingModal, setShowRecordingModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadLectureId, setUploadLectureId] = useState<string | null>(null);
   const [recordingLectureId, setRecordingLectureId] = useState<string | null>(null);
 
   // 로컬스토리지에서 강의와 녹음 데이터 로드
@@ -273,15 +276,16 @@ export default function LecturesPage() {
   };
 
   const handleAddRecording = (lectureId: string) => {
-    setRecordingLectureId(lectureId);
-    setShowRecordingModal(true);
+    setUploadLectureId(lectureId);
+    setShowUploadModal(true);
   };
 
-  const handleSaveRecording = (data: { title: string; audioData: string; duration: number }) => {
-    if (recordingLectureId) {
+  const handleSaveRecording = async (data: { title: string; audioData: string; duration: number }) => {
+    const lectureId = uploadLectureId || recordingLectureId;
+    if (lectureId) {
       const newRecording: Recording = {
         id: Date.now().toString(),
-        lectureId: recordingLectureId,
+        lectureId,
         title: data.title,
         recordedDate: today(),
         duration: data.duration,
@@ -291,6 +295,8 @@ export default function LecturesPage() {
       saveRecordings([...recordings, newRecording]);
       setShowRecordingModal(false);
       setRecordingLectureId(null);
+      setShowUploadModal(false);
+      setUploadLectureId(null);
     }
   };
 
@@ -361,13 +367,13 @@ export default function LecturesPage() {
         )
       )}
 
-      {showRecordingModal && recordingLectureId && (
-        <RecordingModal
-          lectureId={recordingLectureId}
+      {showUploadModal && uploadLectureId && (
+        <RecordingUploadModal
+          lectureId={uploadLectureId}
           onSave={handleSaveRecording}
           onClose={() => {
-            setShowRecordingModal(false);
-            setRecordingLectureId(null);
+            setShowUploadModal(false);
+            setUploadLectureId(null);
           }}
         />
       )}
