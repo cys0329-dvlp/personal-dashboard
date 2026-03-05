@@ -38,17 +38,22 @@ interface DashboardContextType {
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
 
-export function DashboardProvider({ children }: { children: React.ReactNode }) {
-  const [transactions, setTransactions] = useState<Transaction[]>(() => loadTransactions());
-  const [projects, setProjects] = useState<Project[]>(() => loadProjects());
-  const [tasks, setTasks] = useState<Task[]>(() => loadTasks());
-  const [deletedProjects, setDeletedProjects] = useState<Project[]>(() => loadDeletedProjects());
+interface DashboardProviderProps {
+  children: React.ReactNode;
+  username?: string;
+}
+
+export function DashboardProvider({ children, username }: DashboardProviderProps) {
+  const [transactions, setTransactions] = useState<Transaction[]>(() => loadTransactions(username));
+  const [projects, setProjects] = useState<Project[]>(() => loadProjects(username));
+  const [tasks, setTasks] = useState<Task[]>(() => loadTasks(username));
+  const [deletedProjects, setDeletedProjects] = useState<Project[]>(() => loadDeletedProjects(username));
 
   // Persist on change
-  useEffect(() => { saveTransactions(transactions); }, [transactions]);
-  useEffect(() => { saveProjects(projects); }, [projects]);
-  useEffect(() => { saveTasks(tasks); }, [tasks]);
-  useEffect(() => { saveDeletedProjects(deletedProjects); }, [deletedProjects]);
+  useEffect(() => { saveTransactions(transactions, username); }, [transactions, username]);
+  useEffect(() => { saveProjects(projects, username); }, [projects, username]);
+  useEffect(() => { saveTasks(tasks, username); }, [tasks, username]);
+  useEffect(() => { saveDeletedProjects(deletedProjects, username); }, [deletedProjects, username]);
 
   // ---- Transactions ----
   const addTransaction = useCallback((t: Omit<Transaction, 'id' | 'createdAt'>) => {

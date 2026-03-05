@@ -1,4 +1,3 @@
-// ============================================================
 // App.tsx - Main application entry
 // Design: 웜 어스톤 생산성 대시보드
 // ============================================================
@@ -11,10 +10,8 @@ import { useState, useEffect } from "react";
 import Layout, { TabType } from "./components/Layout";
 import CalendarPage from "./pages/CalendarPage";
 import FinancePage from "./pages/FinancePage";
-import CategoriesPage from "./pages/CategoriesPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import LecturesPage from "./pages/LecturesPage";
-import RecordingsPage from "./pages/RecordingsPage";
 import LoginPage from "./pages/LoginPage";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { toast } from "sonner";
@@ -60,13 +57,14 @@ function DashboardApp() {
   }
 
   return (
-    <Layout activeTab={activeTab} onTabChange={setActiveTab} username={username} onLogout={handleLogout}>
-      {activeTab === 'calendar' && <CalendarPage />}
-      {activeTab === 'finance' && <FinancePage />}
-      {activeTab === 'projects' && <ProjectsPage />}
-      {activeTab === 'lectures' && <LecturesPage />}
-      {activeTab === 'recordings' && <RecordingsPage />}
-    </Layout>
+    <DashboardProvider username={username}>
+      <Layout activeTab={activeTab} onTabChange={setActiveTab} username={username} onLogout={handleLogout}>
+        {activeTab === 'calendar' && <CalendarPage />}
+        {activeTab === 'finance' && <FinancePage />}
+        {activeTab === 'projects' && <ProjectsPage />}
+        {activeTab === 'lectures' && <LecturesPage />}
+      </Layout>
+    </DashboardProvider>
   );
 }
 
@@ -75,10 +73,8 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
-          <DashboardProvider>
-            <Toaster />
-            <DashboardApp />
-          </DashboardProvider>
+          <Toaster />
+          <DashboardApp />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
