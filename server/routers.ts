@@ -3,7 +3,11 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { createLectureRecording, getLectureRecordingsByUserId, updateLectureRecording, deleteLectureRecording } from "./db";
+import { 
+  createLectureRecording, getLectureRecordingsByUserId, updateLectureRecording, deleteLectureRecording,
+  createLecture, getLecturesByUserId, updateLecture, deleteLecture,
+  createCustomCategory, getCustomCategoriesByUserId, updateCustomCategory, deleteCustomCategory
+} from "./db";
 import { storagePut } from "./storage";
 
 export const appRouter = router({
@@ -30,6 +34,7 @@ export const appRouter = router({
         description: z.string().optional(),
         audioBase64: z.string(),
         duration: z.number().optional(),
+        lectureId: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         try {
@@ -76,6 +81,7 @@ export const appRouter = router({
           
           return await createLectureRecording({
             userId: ctx.user.id,
+            lectureId: input.lectureId,
             title: input.title,
             subject: input.subject,
             description: input.description,
@@ -95,18 +101,104 @@ export const appRouter = router({
         title: z.string().optional(),
         subject: z.string().optional(),
         description: z.string().optional(),
+        lectureId: z.number().optional(),
       }))
       .mutation(({ ctx, input }) =>
         updateLectureRecording(input.id, ctx.user.id, {
           title: input.title,
           subject: input.subject,
           description: input.description,
+          lectureId: input.lectureId,
         })
       ),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ ctx, input }) =>
         deleteLectureRecording(input.id, ctx.user.id)
+      ),
+  }),
+
+  lectures: router({
+    list: protectedProcedure.query(({ ctx }) =>
+      getLecturesByUserId(ctx.user.id)
+    ),
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        description: z.string().optional(),
+        color: z.string().optional(),
+      }))
+      .mutation(({ ctx, input }) =>
+        createLecture({
+          userId: ctx.user.id,
+          name: input.name,
+          description: input.description,
+          color: input.color,
+        })
+      ),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        color: z.string().optional(),
+      }))
+      .mutation(({ ctx, input }) =>
+        updateLecture(input.id, ctx.user.id, {
+          name: input.name,
+          description: input.description,
+          color: input.color,
+        })
+      ),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ ctx, input }) =>
+        deleteLecture(input.id, ctx.user.id)
+      ),
+  }),
+
+  categories: router({
+    list: protectedProcedure
+      .input(z.object({
+        type: z.enum(['income', 'expense']).optional(),
+      }))
+      .query(({ ctx, input }) =>
+        getCustomCategoriesByUserId(ctx.user.id, input.type)
+      ),
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        type: z.enum(['income', 'expense']),
+        icon: z.string().optional(),
+        color: z.string().optional(),
+      }))
+      .mutation(({ ctx, input }) =>
+        createCustomCategory({
+          userId: ctx.user.id,
+          name: input.name,
+          type: input.type,
+          icon: input.icon,
+          color: input.color,
+        })
+      ),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        icon: z.string().optional(),
+        color: z.string().optional(),
+      }))
+      .mutation(({ ctx, input }) =>
+        updateCustomCategory(input.id, ctx.user.id, {
+          name: input.name,
+          icon: input.icon,
+          color: input.color,
+        })
+      ),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ ctx, input }) =>
+        deleteCustomCategory(input.id, ctx.user.id)
       ),
   }),
 });

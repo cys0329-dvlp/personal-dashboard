@@ -1,4 +1,3 @@
-// ============================================================
 // Projects Page - 프로젝트 일정 관리
 // Design: 웜 어스톤 생산성 대시보드
 // Features:
@@ -10,7 +9,7 @@
 import { useState, useMemo } from 'react';
 import {
   Plus, Pencil, Trash2, X, ChevronDown, ChevronRight,
-  CheckCircle2, Circle, RotateCcw, Clock, Calendar, AlertTriangle
+  CheckCircle2, Circle, RotateCcw, Clock, Calendar, AlertTriangle, Info
 } from 'lucide-react';
 import { useDashboard } from '@/contexts/DashboardContext';
 import { Project, Task, ProjectStatus } from '@/lib/types';
@@ -53,6 +52,82 @@ function ConfirmDialog({ title, message, confirmLabel = '확인', confirmClass =
   );
 }
 
+// ---- Project Detail Modal ----
+interface ProjectDetailModalProps {
+  project: Project;
+  onClose: () => void;
+  onEdit: (p: Project) => void;
+}
+
+function ProjectDetailModal({ project, onClose, onEdit }: ProjectDetailModalProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="warm-card w-full max-w-md p-6 animate-in fade-in slide-in-from-bottom-4 duration-200 max-h-[90vh] overflow-auto">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-bold" style={{ color: 'oklch(0.22 0.04 50)' }}>
+            {project.title}
+          </h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {/* Status */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">상태</label>
+            <span className={cn(
+              "inline-block text-xs px-2 py-1 rounded-full font-semibold",
+              project.status === 'todo' ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"
+            )}>
+              {project.status === 'todo' ? '시작 전' : '진행 중'}
+            </span>
+          </div>
+
+          {/* Dates */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">시작</label>
+              <div className="text-sm font-medium">{formatDisplayDateTime(project.startDate)}</div>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">종료</label>
+              <div className="text-sm font-medium">{formatDisplayDateTime(project.endDate)}</div>
+            </div>
+          </div>
+
+          {/* Description */}
+          {project.description && (
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">설명</label>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{project.description}</p>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-secondary transition-colors"
+            >
+              닫기
+            </button>
+            <button
+              onClick={() => {
+                onEdit(project);
+                onClose();
+              }}
+              className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+            >
+              <Pencil size={16} /> 수정
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---- Project Form Modal ----
 interface ProjectFormProps {
   initial?: Project;
@@ -75,7 +150,7 @@ function ProjectForm({ initial, onSave, onClose }: ProjectFormProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="warm-card w-full max-w-md p-6 animate-in fade-in slide-in-from-bottom-4 duration-200">
+      <div className="warm-card w-full max-w-md p-6 animate-in fade-in slide-in-from-bottom-4 duration-200 max-h-[90vh] overflow-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold" style={{ color: 'oklch(0.22 0.04 50)' }}>
             {initial ? '프로젝트 수정' : '프로젝트 등록'}
@@ -99,149 +174,50 @@ function ProjectForm({ initial, onSave, onClose }: ProjectFormProps) {
             <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">설명</label>
             <textarea
               value={description} onChange={e => setDescription(e.target.value)}
-              placeholder="프로젝트 설명" rows={2}
+              placeholder="프로젝트에 대한 상세 설명을 입력하세요" rows={3}
               className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">상태</label>
-            <div className="flex gap-2">
-              {([
-                { value: 'todo' as const, label: '시작 전', activeClass: 'bg-blue-500 text-white border-blue-500' },
-                { value: 'inprogress' as const, label: '진행 중', activeClass: 'bg-green-500 text-white border-green-500' },
-              ]).map(s => (
-                <button
-                  key={s.value} type="button" onClick={() => setStatus(s.value)}
-                  className={cn(
-                    "flex-1 py-2 text-sm font-semibold rounded-lg border transition-all",
-                    status === s.value ? s.activeClass : "border-border hover:bg-secondary"
-                  )}
-                >
-                  {s.label}
-                </button>
-              ))}
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">상태 *</label>
+            <div className="flex rounded-lg overflow-hidden border border-input">
+              <button
+                type="button"
+                onClick={() => setStatus('todo')}
+                className={cn(
+                  "flex-1 py-2 text-xs font-semibold transition-colors",
+                  status === 'todo' ? "bg-blue-500 text-white" : "bg-background hover:bg-secondary"
+                )}
+              >
+                시작 전
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatus('inprogress')}
+                className={cn(
+                  "flex-1 py-2 text-xs font-semibold transition-colors",
+                  status === 'inprogress' ? "bg-green-500 text-white" : "bg-background hover:bg-secondary"
+                )}
+              >
+                진행 중
+              </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">시작 일시 *</label>
-              <input
-                type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} required
-                className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">종료 일시 *</label>
-              <input
-                type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} required
-                className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-2 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-secondary transition-colors">
-              취소
-            </button>
-            <button type="submit" disabled={!title || !startDate || !endDate} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50">
-              {initial ? '수정 완료' : '등록'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// ---- Task Form Modal ----
-interface TaskFormProps {
-  projectId: string;
-  initial?: Task;
-  onSave: (data: Omit<Task, 'id' | 'createdAt'>) => void;
-  onClose: () => void;
-}
-
-function TaskForm({ projectId, initial, onSave, onClose }: TaskFormProps) {
-  const [title, setTitle] = useState(initial?.title || '');
-  const [dueDate, setDueDate] = useState(initial?.dueDate || today());
-  const [dueTime, setDueTime] = useState(initial?.dueTime || '');
-  const [detail, setDetail] = useState(initial?.detail || '');
-  const [category, setCategory] = useState(initial?.category || '');
-
-  const TASK_CATEGORIES = ['개인일정', '업무', '최우선업무', '학습', '기타'];
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) return;
-    onSave({ projectId, title: title.trim(), dueDate: dueDate || undefined, dueTime: dueTime || undefined, detail: detail.trim(), category: category.trim(), completed: initial?.completed || false });
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="warm-card w-full max-w-sm p-5 animate-in fade-in slide-in-from-bottom-4 duration-200">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-bold" style={{ color: 'oklch(0.22 0.04 50)' }}>
-            {initial ? '할 일 수정' : '할 일 추가'}
-          </h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
-            <X size={16} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">할 일 *</label>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">시작 날짜/시간 *</label>
             <input
-              type="text" value={title} onChange={e => setTitle(e.target.value)}
-              placeholder="할 일 내용" required
+              type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} required
               className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">날짜</label>
-              <input
-                type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">시간</label>
-              <input
-                type="time" value={dueTime} onChange={e => setDueTime(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-          </div>
-
           <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">카테고리</label>
-            <div className="flex flex-wrap gap-1.5">
-              {TASK_CATEGORIES.map(cat => (
-                <button
-                  key={cat} type="button" onClick={() => setCategory(category === cat ? '' : cat)}
-                  className={cn(
-                    "px-2.5 py-1 text-xs rounded-lg border transition-all font-medium",
-                    category === cat
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border hover:border-primary/50 hover:bg-secondary"
-                  )}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">메모</label>
-            <textarea
-              value={detail} onChange={e => setDetail(e.target.value)}
-              placeholder="상세 내용" rows={2}
-              className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">종료 날짜/시간 *</label>
+            <input
+              type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} required
+              className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
 
@@ -264,6 +240,7 @@ interface ProjectCardProps {
   project: Project;
   tasks: Task[];
   onEdit: (p: Project) => void;
+  onShowDetail: (p: Project) => void;
   onComplete: (id: string) => void;
   onDelete: (id: string) => void;
   onAddTask: (projectId: string) => void;
@@ -272,7 +249,7 @@ interface ProjectCardProps {
   onToggleTask: (id: string) => void;
 }
 
-function ProjectCard({ project, tasks, onEdit, onComplete, onDelete, onAddTask, onEditTask, onDeleteTask, onToggleTask }: ProjectCardProps) {
+function ProjectCard({ project, tasks, onEdit, onShowDetail, onComplete, onDelete, onAddTask, onEditTask, onDeleteTask, onToggleTask }: ProjectCardProps) {
   const [expanded, setExpanded] = useState(true);
   const completedCount = tasks.filter(t => t.completed).length;
   const progress = tasks.length > 0 ? Math.round(completedCount / tasks.length * 100) : 0;
@@ -309,7 +286,14 @@ function ProjectCard({ project, tasks, onEdit, onComplete, onDelete, onAddTask, 
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-bold text-base" style={{ color: 'oklch(0.22 0.04 50)' }}>{project.title}</h3>
+              <button
+                onClick={() => onShowDetail(project)}
+                className="font-bold text-base hover:opacity-70 transition flex items-center gap-1"
+                style={{ color: 'oklch(0.22 0.04 50)' }}
+              >
+                {project.title}
+                <Info size={14} className="text-amber-600" />
+              </button>
               <span className={cn(
                 "text-xs px-2 py-0.5 rounded-full font-semibold",
                 isTodo ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"
@@ -322,9 +306,6 @@ function ProjectCard({ project, tasks, onEdit, onComplete, onDelete, onAddTask, 
                 </span>
               )}
             </div>
-            {project.description && (
-              <p className="text-sm text-muted-foreground mt-0.5">{project.description}</p>
-            )}
             <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground flex-wrap">
               <div className="flex items-center gap-1">
                 <Calendar size={11} />
@@ -348,7 +329,7 @@ function ProjectCard({ project, tasks, onEdit, onComplete, onDelete, onAddTask, 
                     className="h-full rounded-full transition-all duration-500"
                     style={{
                       width: `${progress}%`,
-                      background: isTodo ? '#3B82F6' : '#22C55E'
+                      background: 'linear-gradient(90deg, oklch(0.55 0.15 55), oklch(0.65 0.15 55))'
                     }}
                   />
                 </div>
@@ -356,85 +337,81 @@ function ProjectCard({ project, tasks, onEdit, onComplete, onDelete, onAddTask, 
             )}
           </div>
 
-          {/* Actions */}
           <div className="flex gap-1 shrink-0">
             <button
-              onClick={() => onAddTask(project.id)}
-              className="p-1.5 rounded-lg hover:bg-black/10 transition-colors text-muted-foreground hover:text-foreground"
-              title="할 일 추가"
-            >
-              <Plus size={15} />
-            </button>
-            <button
               onClick={() => onEdit(project)}
-              className="p-1.5 rounded-lg hover:bg-black/10 transition-colors text-muted-foreground hover:text-foreground"
-              title="수정"
+              className="p-1.5 rounded-lg hover:bg-black/5 transition-colors"
             >
-              <Pencil size={15} />
+              <Pencil size={14} className="text-muted-foreground" />
             </button>
             <button
               onClick={() => onComplete(project.id)}
-              className="p-1.5 rounded-lg hover:bg-green-100 transition-colors text-muted-foreground hover:text-green-600"
-              title="완료 처리"
+              className="p-1.5 rounded-lg hover:bg-black/5 transition-colors"
             >
-              <CheckCircle2 size={15} />
+              <CheckCircle2 size={14} className="text-muted-foreground" />
             </button>
             <button
               onClick={() => onDelete(project.id)}
-              className="p-1.5 rounded-lg hover:bg-red-50 transition-colors text-muted-foreground hover:text-red-500"
-              title="삭제"
+              className="p-1.5 rounded-lg hover:bg-black/5 transition-colors"
             >
-              <Trash2 size={15} />
+              <Trash2 size={14} className="text-red-500" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Tasks */}
+      {/* Tasks section */}
       {expanded && (
-        <div className="border-t border-black/5 bg-white/50">
+        <div className="px-4 pb-4 border-t border-black/5 space-y-2">
           {tasks.length === 0 ? (
-            <div className="px-6 py-3 text-sm text-muted-foreground">
-              할 일이 없습니다.{' '}
-              <button onClick={() => onAddTask(project.id)} className="text-primary hover:underline font-medium">
-                추가하기
-              </button>
-            </div>
+            <button
+              onClick={() => onAddTask(project.id)}
+              className="w-full py-2.5 rounded-lg border border-dashed border-black/20 text-sm text-muted-foreground hover:bg-black/2 transition-colors flex items-center justify-center gap-2"
+            >
+              <Plus size={14} /> 할 일 추가
+            </button>
           ) : (
-            <div className="divide-y divide-black/5">
+            <>
               {tasks.map(task => (
-                <div key={task.id} className="flex items-center gap-3 px-6 py-2.5 group hover:bg-white/60 transition-colors">
-                  <button onClick={() => onToggleTask(task.id)} className="shrink-0 transition-transform hover:scale-110">
-                    {task.completed
-                      ? <CheckCircle2 size={18} className="text-green-500" />
-                      : <Circle size={18} className="text-muted-foreground" />
-                    }
+                <div key={task.id} className="flex items-start gap-2 p-2 rounded-lg hover:bg-black/2 transition-colors group">
+                  <button
+                    onClick={() => onToggleTask(task.id)}
+                    className="mt-0.5 shrink-0"
+                  >
+                    {task.completed ? (
+                      <CheckCircle2 size={16} className="text-green-500" />
+                    ) : (
+                      <Circle size={16} className="text-muted-foreground" />
+                    )}
                   </button>
                   <div className="flex-1 min-w-0">
-                    <div className={cn("text-sm font-medium", task.completed && "line-through text-muted-foreground")}>
+                    <p className={cn("text-sm", task.completed && "line-through text-muted-foreground")}>
                       {task.title}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {task.dueDate && (
-                        <span>{task.dueDate}{task.dueTime ? ` ${task.dueTime}` : ''}</span>
-                      )}
-                      {task.category && (
-                        <span className="px-1.5 py-0.5 rounded bg-secondary/80 text-muted-foreground">{task.category}</span>
-                      )}
-                      {task.detail && <span className="truncate">· {task.detail}</span>}
-                    </div>
+                    </p>
                   </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => onEditTask(task)} className="p-1 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground">
-                      <Pencil size={13} />
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <button
+                      onClick={() => onEditTask(task)}
+                      className="p-1 rounded hover:bg-black/10 transition-colors"
+                    >
+                      <Pencil size={12} className="text-muted-foreground" />
                     </button>
-                    <button onClick={() => onDeleteTask(task.id)} className="p-1 rounded hover:bg-red-50 transition-colors text-muted-foreground hover:text-red-500">
-                      <Trash2 size={13} />
+                    <button
+                      onClick={() => onDeleteTask(task.id)}
+                      className="p-1 rounded hover:bg-black/10 transition-colors"
+                    >
+                      <Trash2 size={12} className="text-red-500" />
                     </button>
                   </div>
                 </div>
               ))}
-            </div>
+              <button
+                onClick={() => onAddTask(project.id)}
+                className="w-full py-1.5 rounded-lg border border-dashed border-black/20 text-xs text-muted-foreground hover:bg-black/2 transition-colors flex items-center justify-center gap-1"
+              >
+                <Plus size={12} /> 할 일 추가
+              </button>
+            </>
           )}
         </div>
       )}
@@ -442,235 +419,237 @@ function ProjectCard({ project, tasks, onEdit, onComplete, onDelete, onAddTask, 
   );
 }
 
-// ---- Main Projects Page ----
-export default function ProjectsPage() {
-  const { projects, addProject, updateProject, completeProject, tasks, addTask, updateTask, deleteTask, toggleTask, deletedProjects, restoreProject } = useDashboard();
-  const [showProjectForm, setShowProjectForm] = useState(false);
-  const [editProject, setEditProject] = useState<Project | null>(null);
-  const [showTaskForm, setShowTaskForm] = useState(false);
-  const [editTask, setEditTask] = useState<Task | null>(null);
-  const [taskProjectId, setTaskProjectId] = useState<string>('');
-  const [showDeleted, setShowDeleted] = useState(false);
-  const [confirmComplete, setConfirmComplete] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [confirmDeleteTask, setConfirmDeleteTask] = useState<string | null>(null);
+// ---- Task Form Modal ----
+interface TaskFormProps {
+  initial?: Task;
+  onSave: (data: Omit<Task, 'id' | 'createdAt'>) => void;
+  onClose: () => void;
+}
 
-  const activeProjects = projects.filter(p => p.status !== 'done');
-  const todoProjects = activeProjects.filter(p => p.status === 'todo');
-  const inprogressProjects = activeProjects.filter(p => p.status === 'inprogress');
+function TaskForm({ initial, onSave, onClose }: TaskFormProps) {
+  const [title, setTitle] = useState(initial?.title || '');
 
-  const getProjectTasks = (projectId: string) =>
-    tasks.filter(t => t.projectId === projectId).sort((a, b) => {
-      if (a.completed !== b.completed) return a.completed ? 1 : -1;
-      return (a.dueDate || '').localeCompare(b.dueDate || '');
-    });
-
-  const handleProjectSave = (data: Omit<Project, 'id' | 'createdAt'>) => {
-    if (editProject) {
-      updateProject(editProject.id, data);
-    } else {
-      addProject(data);
-    }
-    setShowProjectForm(false);
-    setEditProject(null);
-  };
-
-  const handleTaskSave = (data: Omit<Task, 'id' | 'createdAt'>) => {
-    if (editTask) {
-      updateTask(editTask.id, data);
-    } else {
-      addTask(data);
-    }
-    setShowTaskForm(false);
-    setEditTask(null);
-  };
-
-  const doCompleteProject = (id: string) => {
-    completeProject(id);
-    setConfirmComplete(null);
-  };
-
-  const doDeleteProject = (id: string) => {
-    // Remove related tasks
-    tasks.filter(t => t.projectId === id).forEach(t => deleteTask(t.id));
-    completeProject(id);
-    setConfirmDelete(null);
-  };
-
-  const doDeleteTask = (id: string) => {
-    deleteTask(id);
-    setConfirmDeleteTask(null);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    onSave({ title: title.trim(), projectId: initial?.projectId || '', completed: initial?.completed || false });
   };
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="warm-card w-full max-w-sm p-6 animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-bold" style={{ color: 'oklch(0.22 0.04 50)' }}>
+            {initial ? '할 일 수정' : '할 일 추가'}
+          </h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">할 일 *</label>
+            <input
+              type="text" value={title} onChange={e => setTitle(e.target.value)}
+              placeholder="할 일을 입력하세요" required autoFocus
+              className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-secondary transition-colors">
+              취소
+            </button>
+            <button type="submit" disabled={!title} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50">
+              {initial ? '수정 완료' : '추가'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ---- Main Page ----
+export default function ProjectsPage() {
+  const { projects, tasks, addProject, updateProject, completeProject, addTask, updateTask, deleteTask, toggleTask, restoreProject, deletedProjects } = useDashboard();
+
+  const [showProjectForm, setShowProjectForm] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ type: string; id: string } | null>(null);
+  const [detailProject, setDetailProject] = useState<Project | null>(null);
+  const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
+
+  const activeProjects = projects.filter(p => p.status !== 'done');
+  const projectTasks = (projectId: string) => tasks.filter(t => t.projectId === projectId);
+
+  const handleAddProject = (data: Omit<Project, 'id' | 'createdAt'>) => {
+    addProject(data);
+    setShowProjectForm(false);
+  };
+
+  const handleEditProject = (project: Project) => {
+    setEditingProject(project);
+    setShowProjectForm(true);
+  };
+
+  const handleUpdateProject = (data: Omit<Project, 'id' | 'createdAt'>) => {
+    if (editingProject) {
+      updateProject(editingProject.id, data);
+      setEditingProject(null);
+      setShowProjectForm(false);
+    }
+  };
+
+  const handleCompleteProject = (id: string) => {
+    setConfirmDialog({ type: 'complete', id });
+  };
+
+  const handleDeleteProject = (id: string) => {
+    setConfirmDialog({ type: 'delete', id });
+  };
+
+  const handleConfirm = () => {
+    if (!confirmDialog) return;
+      if (confirmDialog.type === 'complete') {
+      completeProject(confirmDialog.id);
+    } else if (confirmDialog.type === 'delete') {
+      const project = projects.find(p => p.id === confirmDialog.id);
+      if (project) {
+        updateProject(confirmDialog.id, { ...project, status: 'done' });
+      }
+    }
+    setConfirmDialog(null);
+  };
+
+  const handleAddTask = (projectId: string) => {
+    setEditingProjectId(projectId);
+    setEditingTask(null);
+    setShowTaskForm(true);
+  };
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    setShowTaskForm(true);
+  };
+
+  const handleSaveTask = (data: Omit<Task, 'id' | 'createdAt'>) => {
+    if (editingTask) {
+      updateTask(editingTask.id, data);
+    } else {
+      addTask({ ...data, projectId: editingProjectId || '' });
+    }
+    setShowTaskForm(false);
+    setEditingTask(null);
+    setEditingProjectId(null);
+  };
+
+  return (
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold" style={{ color: 'oklch(0.22 0.04 50)' }}>프로젝트 관리</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            진행 중 {inprogressProjects.length}개 · 시작 전 {todoProjects.length}개
-          </p>
-        </div>
+        <h1 className="text-3xl font-bold" style={{ color: 'oklch(0.22 0.04 50)' }}>프로젝트</h1>
         <button
-          onClick={() => { setEditProject(null); setShowProjectForm(true); }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+          onClick={() => { setEditingProject(null); setShowProjectForm(true); }}
+          className="px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2"
         >
-          <Plus size={16} />
-          프로젝트 등록
+          <Plus size={18} /> 프로젝트 추가
         </button>
       </div>
 
-      {/* In Progress */}
-      {inprogressProjects.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-            <h3 className="font-bold text-sm text-muted-foreground uppercase tracking-wide">진행 중</h3>
-            <span className="text-xs text-muted-foreground">({inprogressProjects.length})</span>
+      {/* Projects */}
+      <div className="space-y-3">
+        {activeProjects.length === 0 ? (
+          <div className="warm-card p-8 text-center text-muted-foreground">
+            <p>등록된 프로젝트가 없습니다.</p>
           </div>
-          <div className="space-y-3">
-            {inprogressProjects.map(p => (
-              <ProjectCard
-                key={p.id}
-                project={p}
-                tasks={getProjectTasks(p.id)}
-                onEdit={proj => { setEditProject(proj); setShowProjectForm(true); }}
-                onComplete={id => setConfirmComplete(id)}
-                onDelete={id => setConfirmDelete(id)}
-                onAddTask={pid => { setTaskProjectId(pid); setEditTask(null); setShowTaskForm(true); }}
-                onEditTask={t => { setEditTask(t); setTaskProjectId(t.projectId); setShowTaskForm(true); }}
-                onDeleteTask={id => setConfirmDeleteTask(id)}
-                onToggleTask={toggleTask}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+        ) : (
+          activeProjects.map(project => (
+            <ProjectCard
+              key={project.id}
+              project={project}
+              tasks={projectTasks(project.id)}
+              onEdit={handleEditProject}
+              onShowDetail={setDetailProject}
+              onComplete={handleCompleteProject}
+              onDelete={handleDeleteProject}
+              onAddTask={handleAddTask}
+              onEditTask={handleEditTask}
+              onDeleteTask={deleteTask}
+              onToggleTask={toggleTask}
+            />
+          ))
+        )}
+      </div>
 
-      {/* Todo */}
-      {todoProjects.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-            <h3 className="font-bold text-sm text-muted-foreground uppercase tracking-wide">시작 전</h3>
-            <span className="text-xs text-muted-foreground">({todoProjects.length})</span>
-          </div>
-          <div className="space-y-3">
-            {todoProjects.map(p => (
-              <ProjectCard
-                key={p.id}
-                project={p}
-                tasks={getProjectTasks(p.id)}
-                onEdit={proj => { setEditProject(proj); setShowProjectForm(true); }}
-                onComplete={id => setConfirmComplete(id)}
-                onDelete={id => setConfirmDelete(id)}
-                onAddTask={pid => { setTaskProjectId(pid); setEditTask(null); setShowTaskForm(true); }}
-                onEditTask={t => { setEditTask(t); setTaskProjectId(t.projectId); setShowTaskForm(true); }}
-                onDeleteTask={id => setConfirmDeleteTask(id)}
-                onToggleTask={toggleTask}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {activeProjects.length === 0 && (
-        <div className="warm-card p-12 text-center">
-          <div className="text-4xl mb-3">🗂️</div>
-          <p className="font-semibold text-lg mb-1">프로젝트가 없습니다</p>
-          <p className="text-sm text-muted-foreground mb-4">새 프로젝트를 등록해보세요</p>
-          <button
-            onClick={() => { setEditProject(null); setShowProjectForm(true); }}
-            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
-          >
-            프로젝트 등록
-          </button>
-        </div>
-      )}
-
-      {/* Completed projects recovery */}
-      {deletedProjects.length > 0 && (
-        <div className="warm-card p-4">
-          <button
-            onClick={() => setShowDeleted(v => !v)}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors font-semibold w-full"
-          >
-            <RotateCcw size={14} />
-            완료된 프로젝트 ({deletedProjects.length}개)
-            {showDeleted ? <ChevronDown size={14} className="ml-auto" /> : <ChevronRight size={14} className="ml-auto" />}
-          </button>
-
-          {showDeleted && (
-            <div className="mt-3 space-y-2">
-              {deletedProjects.map(p => (
-                <div key={p.id} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/50">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-sm line-through text-muted-foreground">{p.title}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      완료 처리: {p.deletedAt ? new Date(p.deletedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : '-'}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => restoreProject(p.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors shrink-0"
-                  >
-                    <RotateCcw size={12} />
-                    복구
-                  </button>
-                </div>
-              ))}
+      {/* Archived Projects */}
+      {archivedProjects.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-bold" style={{ color: 'oklch(0.22 0.04 50)' }}>완료된 프로젝트</h2>
+          {archivedProjects.map(project => (
+            <div key={project.id} className="warm-card p-4 flex items-center justify-between opacity-60">
+              <div>
+                <h3 className="font-bold text-base" style={{ color: 'oklch(0.22 0.04 50)' }}>{project.title}</h3>
+                <p className="text-xs text-muted-foreground mt-1">{formatDisplayDateTime(project.endDate)}</p>
+              </div>
+              <button
+                onClick={() => {
+                  restoreProject(project.id);
+                  setArchivedProjects(archivedProjects.filter(p => p.id !== project.id));
+                }}
+                className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-secondary transition-colors flex items-center gap-1"
+              >
+                <RotateCcw size={12} /> 복구
+              </button>
             </div>
-          )}
+          ))}
         </div>
       )}
 
       {/* Modals */}
       {showProjectForm && (
-        <ProjectForm
-          initial={editProject || undefined}
-          onSave={handleProjectSave}
-          onClose={() => { setShowProjectForm(false); setEditProject(null); }}
-        />
+        editingProject ? (
+          <ProjectForm
+            initial={editingProject}
+            onSave={handleUpdateProject}
+            onClose={() => { setShowProjectForm(false); setEditingProject(null); }}
+          />
+        ) : (
+          <ProjectForm
+            onSave={handleAddProject}
+            onClose={() => setShowProjectForm(false)}
+          />
+        )
       )}
+
       {showTaskForm && (
         <TaskForm
-          projectId={taskProjectId}
-          initial={editTask || undefined}
-          onSave={handleTaskSave}
-          onClose={() => { setShowTaskForm(false); setEditTask(null); }}
+          initial={editingTask || undefined}
+          onSave={handleSaveTask}
+          onClose={() => { setShowTaskForm(false); setEditingTask(null); setEditingProjectId(null); }}
         />
       )}
 
-      {/* Confirm dialogs */}
-      {confirmComplete && (
+      {confirmDialog && (
         <ConfirmDialog
-          title="프로젝트 완료 처리"
-          message="이 프로젝트를 완료 처리하시겠습니까? 완료된 프로젝트는 목록에서 숨겨지지만, 언제든지 복구할 수 있습니다."
-          confirmLabel="완료 처리"
-          confirmClass="bg-green-500 text-white hover:bg-green-600"
-          onConfirm={() => doCompleteProject(confirmComplete)}
-          onCancel={() => setConfirmComplete(null)}
+          title={confirmDialog.type === 'complete' ? '프로젝트 완료' : '프로젝트 삭제'}
+          message={confirmDialog.type === 'complete' ? '이 프로젝트를 완료 처리하시겠습니까?' : '이 프로젝트를 삭제하시겠습니까?'}
+          confirmLabel={confirmDialog.type === 'complete' ? '완료' : '삭제'}
+          confirmClass={confirmDialog.type === 'complete' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}
+          onConfirm={handleConfirm}
+          onCancel={() => setConfirmDialog(null)}
         />
       )}
-      {confirmDelete && (
-        <ConfirmDialog
-          title="프로젝트 삭제"
-          message="이 프로젝트와 관련된 모든 할 일을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
-          confirmLabel="삭제"
-          confirmClass="bg-red-500 text-white hover:bg-red-600"
-          onConfirm={() => doDeleteProject(confirmDelete)}
-          onCancel={() => setConfirmDelete(null)}
-        />
-      )}
-      {confirmDeleteTask && (
-        <ConfirmDialog
-          title="할 일 삭제"
-          message="이 할 일을 삭제하시겠습니까?"
-          confirmLabel="삭제"
-          confirmClass="bg-red-500 text-white hover:bg-red-600"
-          onConfirm={() => doDeleteTask(confirmDeleteTask)}
-          onCancel={() => setConfirmDeleteTask(null)}
+
+      {detailProject && (
+        <ProjectDetailModal
+          project={detailProject}
+          onClose={() => setDetailProject(null)}
+          onEdit={handleEditProject}
         />
       )}
     </div>

@@ -1,6 +1,6 @@
 import { eq, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, lectureRecordings, InsertLectureRecording } from "../drizzle/schema";
+import { InsertUser, users, lectureRecordings, InsertLectureRecording, lectures, InsertLecture, customCategories, InsertCustomCategory } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -161,4 +161,156 @@ export async function deleteLectureRecording(id: number, userId: number) {
   }
 
   return await db.delete(lectureRecordings).where(eq(lectureRecordings.id, id));
+}
+
+// ---- Lectures ----
+export async function createLecture(lecture: InsertLecture) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const result = await db.insert(lectures).values(lecture);
+  return result;
+}
+
+export async function getLecturesByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    return [];
+  }
+
+  return await db
+    .select()
+    .from(lectures)
+    .where(eq(lectures.userId, userId))
+    .orderBy(desc(lectures.createdAt));
+}
+
+export async function getLectureById(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) {
+    return undefined;
+  }
+
+  const result = await db
+    .select()
+    .from(lectures)
+    .where(eq(lectures.id, id))
+    .limit(1);
+
+  if (result.length === 0) return undefined;
+  if (result[0].userId !== userId) return undefined;
+
+  return result[0];
+}
+
+export async function updateLecture(id: number, userId: number, updates: Partial<InsertLecture>) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const existing = await getLectureById(id, userId);
+  if (!existing) {
+    throw new Error("Lecture not found or unauthorized");
+  }
+
+  return await db
+    .update(lectures)
+    .set({ ...updates, updatedAt: new Date() })
+    .where(eq(lectures.id, id));
+}
+
+export async function deleteLecture(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const existing = await getLectureById(id, userId);
+  if (!existing) {
+    throw new Error("Lecture not found or unauthorized");
+  }
+
+  return await db.delete(lectures).where(eq(lectures.id, id));
+}
+
+// ---- Custom Categories ----
+export async function createCustomCategory(category: InsertCustomCategory) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const result = await db.insert(customCategories).values(category);
+  return result;
+}
+
+export async function getCustomCategoriesByUserId(userId: number, type?: 'income' | 'expense') {
+  const db = await getDb();
+  if (!db) {
+    return [];
+  }
+
+  let query = db
+    .select()
+    .from(customCategories)
+    .where(eq(customCategories.userId, userId));
+
+  if (type) {
+    const filtered = await query;
+    return filtered.filter(cat => cat.type === type);
+  }
+
+  return await query.orderBy(desc(customCategories.createdAt));
+}
+
+export async function getCustomCategoryById(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) {
+    return undefined;
+  }
+
+  const result = await db
+    .select()
+    .from(customCategories)
+    .where(eq(customCategories.id, id))
+    .limit(1);
+
+  if (result.length === 0) return undefined;
+  if (result[0].userId !== userId) return undefined;
+
+  return result[0];
+}
+
+export async function updateCustomCategory(id: number, userId: number, updates: Partial<InsertCustomCategory>) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const existing = await getCustomCategoryById(id, userId);
+  if (!existing) {
+    throw new Error("Category not found or unauthorized");
+  }
+
+  return await db
+    .update(customCategories)
+    .set({ ...updates, updatedAt: new Date() })
+    .where(eq(customCategories.id, id));
+}
+
+export async function deleteCustomCategory(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const existing = await getCustomCategoryById(id, userId);
+  if (!existing) {
+    throw new Error("Category not found or unauthorized");
+  }
+
+  return await db.delete(customCategories).where(eq(customCategories.id, id));
 }

@@ -15,6 +15,13 @@
       "when": 1772716618845,
       "tag": "0001_friendly_skullbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1772727474367,
+      "tag": "0002_great_lilandra",
+      "breakpoints": true
     }
   ]
 }

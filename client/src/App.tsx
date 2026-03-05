@@ -11,7 +11,9 @@ import { useState } from "react";
 import Layout, { TabType } from "./components/Layout";
 import CalendarPage from "./pages/CalendarPage";
 import FinancePage from "./pages/FinancePage";
+import CategoriesPage from "./pages/CategoriesPage";
 import ProjectsPage from "./pages/ProjectsPage";
+import LecturesPage from "./pages/LecturesPage";
 import RecordingsPage from "./pages/RecordingsPage";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -22,7 +24,9 @@ function DashboardApp() {
     <Layout activeTab={activeTab} onTabChange={setActiveTab}>
       {activeTab === 'calendar' && <CalendarPage />}
       {activeTab === 'finance' && <FinancePage />}
+      {activeTab === 'categories' && <CategoriesPage />}
       {activeTab === 'projects' && <ProjectsPage />}
+      {activeTab === 'lectures' && <LecturesPage />}
       {activeTab === 'recordings' && <RecordingsPage />}
     </Layout>
   );

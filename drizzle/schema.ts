@@ -33,6 +33,7 @@ export type InsertUser = typeof users.$inferInsert;
 export const lectureRecordings = mysqlTable("lectureRecordings", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
+  lectureId: int("lectureId"), // 강의 ID (선택사항)
   title: text("title").notNull(),
   subject: varchar("subject", { length: 255 }),
   description: text("description"),
@@ -50,11 +51,68 @@ export type InsertLectureRecording = typeof lectureRecordings.$inferInsert;
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   lectureRecordings: many(lectureRecordings),
+  lectures: many(lectures),
+  customCategories: many(customCategories),
 }));
 
 export const lectureRecordingsRelations = relations(lectureRecordings, ({ one }) => ({
   user: one(users, {
     fields: [lectureRecordings.userId],
+    references: [users.id],
+  }),
+  lecture: one(lectures, {
+    fields: [lectureRecordings.lectureId],
+    references: [lectures.id],
+  }),
+}));
+
+/**
+ * Lectures table - 과목 관리
+ */
+export const lectures = mysqlTable("lectures", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(), // 과목명 (예: AI리터러시)
+  description: text("description"), // 과목 설명
+  color: varchar("color", { length: 7 }).default("#3B82F6"), // 색상 코드
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Lecture = typeof lectures.$inferSelect;
+export type InsertLecture = typeof lectures.$inferInsert;
+
+/**
+ * Custom categories for finance tracking
+ */
+export const customCategories = mysqlTable("customCategories", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 100 }).notNull(), // 카테고리명 (예: 식비, 교통비)
+  type: mysqlEnum("type", ["income", "expense"]).notNull(), // 수입/지출
+  icon: varchar("icon", { length: 50 }).default("tag"), // 아이콘 이름
+  color: varchar("color", { length: 7 }).default("#6B7280"), // 색상 코드
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CustomCategory = typeof customCategories.$inferSelect;
+export type InsertCustomCategory = typeof customCategories.$inferInsert;
+
+
+
+// Relations
+export const lecturesRelations = relations(lectures, ({ many, one }) => ({
+  user: one(users, {
+    fields: [lectures.userId],
+    references: [users.id],
+  }),
+  recordings: many(lectureRecordings),
+}));
+
+export const customCategoriesRelations = relations(customCategories, ({ one }) => ({
+  user: one(users, {
+    fields: [customCategories.userId],
     references: [users.id],
   }),
 }));
