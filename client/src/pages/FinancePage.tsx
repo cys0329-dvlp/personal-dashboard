@@ -28,12 +28,10 @@ function TransactionForm({ initial, onSave, onClose }: TransactionFormProps) {
   const [detail, setDetail] = useState(initial?.detail || '');
   const [account, setAccount] = useState(initial?.account || '');
 
-  const categories = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !amount || !date || !category) return;
-    onSave({ type, title: title.trim(), amount: Number(amount), date, category: category as any, detail: detail.trim(), account: account.trim() });
+    if (!title.trim() || !amount || !date || !category.trim()) return;
+    onSave({ type, title: title.trim(), amount: Number(amount), date, category: category.trim() as any, detail: detail.trim(), account: account.trim() });
   };
 
   return (
@@ -104,21 +102,11 @@ function TransactionForm({ initial, onSave, onClose }: TransactionFormProps) {
 
           <div>
             <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">카테고리 *</label>
-            <div className="grid grid-cols-3 gap-1.5">
-              {categories.map(cat => (
-                <button
-                  key={cat} type="button" onClick={() => setCategory(cat)}
-                  className={cn(
-                    "py-1.5 px-2 text-xs rounded-lg border transition-all font-medium",
-                    category === cat
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border hover:border-primary/50 hover:bg-secondary"
-                  )}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+            <input
+              type="text" value={category} onChange={e => setCategory(e.target.value)}
+              placeholder="예: 식비, 급여, 교통비" required
+              className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
           </div>
 
           <div>

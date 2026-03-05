@@ -5,7 +5,7 @@
 // ============================================================
 
 import { useState } from 'react';
-import { CalendarDays, Wallet, FolderKanban, Mic, Menu, X, BookOpen, Settings } from 'lucide-react';
+import { CalendarDays, Wallet, FolderKanban, Mic, Menu, X, BookOpen, Settings, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type TabType = 'calendar' | 'finance' | 'categories' | 'projects' | 'lectures' | 'recordings';
@@ -14,6 +14,8 @@ interface LayoutProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
   children: React.ReactNode;
+  username?: string;
+  onLogout?: () => void;
 }
 
 const navItems = [
@@ -25,7 +27,7 @@ const navItems = [
   { id: 'recordings' as TabType, label: '강의 녹음', icon: Mic },
 ];
 
-export default function Layout({ activeTab, onTabChange, children }: LayoutProps) {
+export default function Layout({ activeTab, onTabChange, children, username, onLogout }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -91,8 +93,26 @@ export default function Layout({ activeTab, onTabChange, children }: LayoutProps
           ))}
         </nav>
 
+        {/* User Info */}
+        {username && (
+          <div className="px-5 py-4 border-t border-white/10 space-y-3">
+            <div>
+              <p className="text-white/50 text-xs">로그인됨</p>
+              <p className="text-white font-semibold text-sm mt-1">{username}</p>
+            </div>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white/70 hover:bg-white/10 transition-colors"
+              >
+                <LogOut size={16} /> 로그아웃
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Bottom info */}
-        <div className="px-5 py-4 border-t border-white/10">
+        <div className={cn("px-5 py-4 border-t border-white/10", username && "hidden")}>
           <div className="text-white/30 text-xs text-center">
             {new Date().getFullYear()}년 개인 대시보드
           </div>

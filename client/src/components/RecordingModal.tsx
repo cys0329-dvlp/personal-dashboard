@@ -8,19 +8,16 @@ import { Mic, Square, Play, Pause, X, Upload, AlertCircle, HelpCircle, Volume2 }
 import { cn } from '@/lib/utils';
 
 interface RecordingModalProps {
-  isOpen: boolean;
+  lectureId: string;
   onClose: () => void;
   onSave: (data: {
     title: string;
-    subject: string;
-    description: string;
-    audioBase64: string;
+    audioData: string;
     duration: number;
-  }) => Promise<void>;
-  isSaving?: boolean;
+  }) => void;
 }
 
-export default function RecordingModal({ isOpen, onClose, onSave, isSaving = false }: RecordingModalProps) {
+export default function RecordingModal({ lectureId, onClose, onSave }: RecordingModalProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -31,8 +28,6 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [title, setTitle] = useState('');
-  const [subject, setSubject] = useState('');
-  const [description, setDescription] = useState('');
   const [error, setError] = useState('');
   const [recordingTime, setRecordingTime] = useState(0);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
@@ -40,22 +35,18 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
   const [showPermissionHelp, setShowPermissionHelp] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
 
-  useEffect(() => {
-    if (!isOpen) {
-      // Reset state when modal closes
-      stopRecording();
-      setTitle('');
-      setSubject('');
-      setDescription('');
-      setRecordedAudio(null);
-      setDuration(0);
-      setRecordingTime(0);
-      setError('');
-      setIsPlaying(false);
-      setShowPermissionHelp(false);
-      setAudioLevel(0);
-    }
-  }, [isOpen]);
+  const handleClose = () => {
+    stopRecording();
+    setTitle('');
+    setRecordedAudio(null);
+    setDuration(0);
+    setRecordingTime(0);
+    setError('');
+    setIsPlaying(false);
+    setShowPermissionHelp(false);
+    setAudioLevel(0);
+    onClose();
+  };
 
   // Audio level visualization
   useEffect(() => {
@@ -234,14 +225,12 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
         const base64Data = result.includes(',') ? result.split(',')[1] : result;
         
         try {
-          await onSave({
+          onSave({
             title: title.trim(),
-            subject: subject.trim(),
-            description: description.trim(),
-            audioBase64: base64Data,
+            audioData: base64Data,
             duration,
           });
-          onClose();
+          handleClose();
         } catch (err) {
           setError('저장 중 오류가 발생했습니다.');
           console.error('Save error:', err);
@@ -264,8 +253,6 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  if (!isOpen) return null;
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="warm-card w-full max-w-md p-6 animate-in fade-in slide-in-from-bottom-4 duration-200 max-h-[90vh] overflow-y-auto">
@@ -279,7 +266,7 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
               강의 녹음
             </h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+          <button onClick={handleClose} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -394,31 +381,7 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
               />
             </div>
 
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
-                과목
-              </label>
-              <input
-                type="text"
-                value={subject}
-                onChange={e => setSubject(e.target.value)}
-                placeholder="예: 데이터베이스 개론"
-                className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
 
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
-                메모
-              </label>
-              <textarea
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="강의 내용에 대한 간단한 메모..."
-                rows={2}
-                className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-              />
-            </div>
           </div>
         )}
 
@@ -448,7 +411,7 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
         {/* Action Buttons */}
         <div className="flex gap-2">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-secondary transition-colors"
           >
             취소
@@ -456,20 +419,11 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
           {recordedAudio && (
             <button
               onClick={handleSave}
-              disabled={!title.trim() || isSaving}
+              disabled={!title.trim()}
               className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isSaving ? (
-                <>
-                  <div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                  저장 중...
-                </>
-              ) : (
-                <>
-                  <Upload size={14} />
-                  저장
-                </>
-              )}
+              <Upload size={14} />
+              저장
             </button>
           )}
         </div>

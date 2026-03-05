@@ -269,14 +269,6 @@ export default function RecordingsPage() {
         </div>
       )}
 
-      {/* Recording Modal */}
-      <RecordingModal
-        isOpen={showRecordingModal}
-        onClose={() => setShowRecordingModal(false)}
-        onSave={handleCreateRecording}
-        isSaving={createMutation.isPending}
-      />
-
       {/* Delete Confirmation */}
       {deleteConfirmId !== null && (
         <ConfirmDialog
