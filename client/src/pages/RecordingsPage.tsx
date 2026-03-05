@@ -3,8 +3,8 @@
 // Design: 웜 어스톤 생산성 대시보드
 // ============================================================
 
-import { useState } from 'react';
-import { Plus, Play, Pause, Download, Trash2, AlertTriangle } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Plus, Play, Pause, Download, Trash2, AlertTriangle, Volume2 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import RecordingModal from '@/components/RecordingModal';
 
@@ -45,6 +45,7 @@ export default function RecordingsPage() {
   const [showRecordingModal, setShowRecordingModal] = useState(false);
   const [playingId, setPlayingId] = useState<number | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const audioPlayersRef = useRef<{ [key: number]: HTMLAudioElement }>({});
 
   const { data: recordings = [], isLoading, refetch } = trpc.recordings.list.useQuery();
   const createMutation = trpc.recordings.create.useMutation();
@@ -73,6 +74,41 @@ export default function RecordingsPage() {
       setDeleteConfirmId(null);
     } catch (error) {
       console.error('Failed to delete recording:', error);
+    }
+  };
+
+  const togglePlayback = (recordingId: number, audioUrl: string) => {
+    // Stop all other players
+    Object.entries(audioPlayersRef.current).forEach(([id, player]) => {
+      if (parseInt(id) !== recordingId) {
+        player.pause();
+      }
+    });
+
+    if (playingId === recordingId) {
+      // Stop current playback
+      const player = audioPlayersRef.current[recordingId];
+      if (player) {
+        player.pause();
+      }
+      setPlayingId(null);
+    } else {
+      // Start playback
+      let player = audioPlayersRef.current[recordingId];
+      if (!player) {
+        player = new Audio(audioUrl);
+        player.crossOrigin = 'anonymous';
+        player.onended = () => setPlayingId(null);
+        player.onerror = (e) => {
+          console.error('Audio playback error:', e);
+          setPlayingId(null);
+        };
+        audioPlayersRef.current[recordingId] = player;
+      }
+      player.play().catch(err => {
+        console.error('Failed to play audio:', err);
+      });
+      setPlayingId(recordingId);
     }
   };
 
@@ -143,8 +179,9 @@ export default function RecordingsPage() {
               <div className="flex items-start gap-4">
                 {/* Play Button */}
                 <button
-                  onClick={() => setPlayingId(playingId === recording.id ? null : recording.id)}
+                  onClick={() => togglePlayback(recording.id, recording.audioUrl)}
                   className="shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
+                  title={playingId === recording.id ? '일시정지' : '재생'}
                 >
                   {playingId === recording.id ? (
                     <Pause size={20} className="text-primary" />
@@ -179,16 +216,12 @@ export default function RecordingsPage() {
                     </p>
                   )}
 
-                  {/* Hidden audio player */}
+                  {/* Playback Status */}
                   {playingId === recording.id && (
-                    <audio
-                      key={recording.id}
-                      src={recording.audioUrl}
-                      autoPlay
-                      onEnded={() => setPlayingId(null)}
-                      className="w-full mt-2 h-8"
-                      controls
-                    />
+                    <div className="mt-2 flex items-center gap-2 text-xs text-primary">
+                      <Volume2 size={12} />
+                      <span>재생 중...</span>
+                    </div>
                   )}
                 </div>
 

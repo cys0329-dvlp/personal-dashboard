@@ -4,8 +4,12 @@
 // ============================================================
 
 import { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Play, Pause, X, Upload, AlertCircle, HelpCircle } from 'lucide-react';
+import { Mic, Square, Play, Pause, X, Upload, AlertCircle, HelpCircle, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+interface MediaRecorderErrorEvent extends Event {
+  error: string;
+}
 
 interface RecordingModalProps {
   isOpen: boolean;
@@ -38,6 +42,7 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [showPermissionHelp, setShowPermissionHelp] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
 
   useEffect(() => {
     if (!isOpen) {
@@ -52,8 +57,28 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
       setError('');
       setIsPlaying(false);
       setShowPermissionHelp(false);
+      setAudioLevel(0);
     }
   }, [isOpen]);
+
+  // Audio level visualization
+  useEffect(() => {
+    if (!isRecording || !analyserRef.current) return;
+
+    const visualize = () => {
+      if (!analyserRef.current) return;
+      
+      const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+      analyserRef.current.getByteFrequencyData(dataArray);
+      
+      const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+      setAudioLevel(Math.min(100, (average / 255) * 100));
+      
+      requestAnimationFrame(visualize);
+    };
+
+    visualize();
+  }, [isRecording]);
 
   const getPermissionErrorMessage = (err: any): string => {
     if (err.name === 'NotAllowedError' || err.name === 'PermissionDismissedError') {
@@ -86,31 +111,76 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true,
+          autoGainControl: false, // Disable for better control
+          sampleRate: 48000, // Higher sample rate for better quality
         }
       });
       
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      // Check if audio tracks exist
+      if (stream.getAudioTracks().length === 0) {
+        setError('마이크에서 오디오 신호를 감지할 수 없습니다. 마이크를 확인해주세요.');
+        return;
+      }
+
+      // Use WebM if available, fallback to other formats
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : MediaRecorder.isTypeSupported('audio/mp4')
+        ? 'audio/mp4'
+        : '';
+
+      if (!mimeType) {
+        setError('이 브라우저는 지원하는 오디오 형식이 없습니다.');
+        return;
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
       // Setup audio context for visualization
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 256;
+      
       const source = audioContextRef.current.createMediaStreamSource(stream);
       source.connect(analyserRef.current);
 
       mediaRecorder.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        if (audioChunksRef.current.length === 0) {
+          setError('녹음 데이터가 없습니다. 다시 시도해주세요.');
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        
+        // Verify blob size
+        if (audioBlob.size === 0) {
+          setError('녹음 파일이 비어있습니다. 다시 시도해주세요.');
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+
         setRecordedAudio(audioBlob);
         stream.getTracks().forEach(track => track.stop());
       };
 
-      mediaRecorder.start();
+      mediaRecorder.onerror = (event: Event) => {
+        const errorEvent = event as MediaRecorderErrorEvent;
+        setError(`녹음 오류: ${errorEvent.error}`);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start(100); // Collect data every 100ms for better reliability
       setIsRecording(true);
       setRecordingTime(0);
 
@@ -131,6 +201,7 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       setDuration(recordingTime);
+      setAudioLevel(0);
       
       if (recordingIntervalRef.current) {
         clearInterval(recordingIntervalRef.current);
@@ -145,7 +216,9 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
       audioPlayerRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioPlayerRef.current.play();
+      audioPlayerRef.current.play().catch(err => {
+        setError(`재생 오류: ${err.message}`);
+      });
       setIsPlaying(true);
     }
   };
@@ -169,6 +242,9 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
           duration,
         });
         onClose();
+      };
+      reader.onerror = () => {
+        setError('파일 읽기 오류가 발생했습니다.');
       };
       reader.readAsDataURL(recordedAudio);
     } catch (err) {
@@ -254,6 +330,21 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
             )}
           </div>
 
+          {/* Audio Level Indicator */}
+          {isRecording && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Volume2 size={14} className="text-amber-600" />
+                <div className="flex-1 h-2 rounded-full bg-gray-200 overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-green-500 to-amber-500 transition-all duration-100"
+                    style={{ width: `${audioLevel}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Recording Time Display */}
           {(isRecording || recordedAudio) && (
             <div className="text-center">
@@ -272,7 +363,13 @@ export default function RecordingModal({ isOpen, onClose, onSave, isSaving = fal
               ref={audioPlayerRef}
               src={URL.createObjectURL(recordedAudio)}
               onEnded={() => setIsPlaying(false)}
+              onError={(e) => {
+                console.error('Audio playback error:', e);
+                setError('재생할 수 없는 파일입니다. 다시 녹음해주세요.');
+                setIsPlaying(false);
+              }}
               className="hidden"
+              crossOrigin="anonymous"
             />
           )}
         </div>
