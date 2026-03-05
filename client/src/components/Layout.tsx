@@ -5,10 +5,10 @@
 // ============================================================
 
 import { useState } from 'react';
-import { CalendarDays, Wallet, FolderKanban, RotateCcw, Menu, X } from 'lucide-react';
+import { CalendarDays, Wallet, FolderKanban, Mic, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type TabType = 'calendar' | 'finance' | 'projects';
+export type TabType = 'calendar' | 'finance' | 'projects' | 'recordings';
 
 interface LayoutProps {
   activeTab: TabType;
@@ -20,6 +20,7 @@ const navItems = [
   { id: 'calendar' as TabType, label: '캘린더', icon: CalendarDays },
   { id: 'finance' as TabType, label: '가계부', icon: Wallet },
   { id: 'projects' as TabType, label: '프로젝트', icon: FolderKanban },
+  { id: 'recordings' as TabType, label: '강의 녹음', icon: Mic },
 ];
 
 export default function Layout({ activeTab, onTabChange, children }: LayoutProps) {

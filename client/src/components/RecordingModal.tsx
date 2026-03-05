@@ -1,0 +1,329 @@
+// ============================================================
+// Recording Modal - 강의 녹음 기능
+// Design: 웜 어스톤 생산성 대시보드
+// ============================================================
+
+import { useState, useRef, useEffect } from 'react';
+import { Mic, Square, Play, Pause, X, Upload, AlertCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface RecordingModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (data: {
+    title: string;
+    subject: string;
+    description: string;
+    audioBase64: string;
+    duration: number;
+  }) => Promise<void>;
+  isSaving?: boolean;
+}
+
+export default function RecordingModal({ isOpen, onClose, onSave, isSaving = false }: RecordingModalProps) {
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
+  const [duration, setDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [title, setTitle] = useState('');
+  const [subject, setSubject] = useState('');
+  const [description, setDescription] = useState('');
+  const [error, setError] = useState('');
+  const [recordingTime, setRecordingTime] = useState(0);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset state when modal closes
+      stopRecording();
+      setTitle('');
+      setSubject('');
+      setDescription('');
+      setRecordedAudio(null);
+      setDuration(0);
+      setRecordingTime(0);
+      setError('');
+      setIsPlaying(false);
+    }
+  }, [isOpen]);
+
+  const startRecording = async () => {
+    try {
+      setError('');
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      // Setup audio context for visualization
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      source.connect(analyserRef.current);
+
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setRecordedAudio(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      // Timer
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      setError('마이크 접근 권한이 필요합니다.');
+      console.error('Recording error:', err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      setDuration(recordingTime);
+      
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+    }
+  };
+
+  const togglePlayback = () => {
+    if (!recordedAudio || !audioPlayerRef.current) return;
+
+    if (isPlaying) {
+      audioPlayerRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioPlayerRef.current.play();
+      setIsPlaying(true);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!recordedAudio || !title.trim()) {
+      setError('제목을 입력하고 녹음을 완료해주세요.');
+      return;
+    }
+
+    try {
+      setError('');
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = (reader.result as string).split(',')[1];
+        await onSave({
+          title: title.trim(),
+          subject: subject.trim(),
+          description: description.trim(),
+          audioBase64: base64,
+          duration,
+        });
+        onClose();
+      };
+      reader.readAsDataURL(recordedAudio);
+    } catch (err) {
+      setError('저장 중 오류가 발생했습니다.');
+      console.error('Save error:', err);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="warm-card w-full max-w-md p-6 animate-in fade-in slide-in-from-bottom-4 duration-200 max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+              <Mic size={16} className="text-amber-600" />
+            </div>
+            <h2 className="text-lg font-bold" style={{ color: 'oklch(0.22 0.04 50)' }}>
+              강의 녹음
+            </h2>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Recording Controls */}
+        <div className="space-y-4 mb-5">
+          <div className="flex gap-2">
+            {!recordedAudio ? (
+              <>
+                {!isRecording ? (
+                  <button
+                    onClick={startRecording}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
+                  >
+                    <Mic size={16} />
+                    녹음 시작
+                  </button>
+                ) : (
+                  <>
+                    <div className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-red-500 text-white font-semibold">
+                      <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                      녹음 중...
+                    </div>
+                    <button
+                      onClick={stopRecording}
+                      className="px-4 py-3 rounded-lg bg-gray-500 text-white font-semibold hover:bg-gray-600 transition-colors"
+                    >
+                      <Square size={16} />
+                    </button>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={togglePlayback}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors"
+                >
+                  {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                  {isPlaying ? '일시정지' : '재생'}
+                </button>
+                <button
+                  onClick={() => {
+                    setRecordedAudio(null);
+                    setRecordingTime(0);
+                  }}
+                  className="px-4 py-3 rounded-lg border border-border hover:bg-secondary transition-colors"
+                >
+                  다시 녹음
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Recording Time Display */}
+          {(isRecording || recordedAudio) && (
+            <div className="text-center">
+              <div className="text-2xl font-bold font-mono" style={{ color: 'oklch(0.55 0.15 55)' }}>
+                {formatTime(isRecording ? recordingTime : duration)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {isRecording ? '녹음 중' : '녹음 완료'}
+              </p>
+            </div>
+          )}
+
+          {/* Hidden audio player */}
+          {recordedAudio && (
+            <audio
+              ref={audioPlayerRef}
+              src={URL.createObjectURL(recordedAudio)}
+              onEnded={() => setIsPlaying(false)}
+              className="hidden"
+            />
+          )}
+        </div>
+
+        {/* Form Fields */}
+        {recordedAudio && (
+          <div className="space-y-3 mb-5 pb-5 border-b border-border">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                제목 *
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="예: 데이터베이스 강의 - 3월 5일"
+                className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                과목
+              </label>
+              <input
+                type="text"
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
+                placeholder="예: 데이터베이스 개론"
+                className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                메모
+              </label>
+              <textarea
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="강의 내용에 대한 간단한 메모..."
+                rows={2}
+                className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2">
+            <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-red-700">{error}</p>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-secondary transition-colors"
+          >
+            취소
+          </button>
+          {recordedAudio && (
+            <button
+              onClick={handleSave}
+              disabled={!title.trim() || isSaving}
+              className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isSaving ? (
+                <>
+                  <div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  저장 중...
+                </>
+              ) : (
+                <>
+                  <Upload size={14} />
+                  저장
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

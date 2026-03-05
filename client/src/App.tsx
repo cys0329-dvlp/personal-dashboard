@@ -12,16 +12,18 @@ import Layout, { TabType } from "./components/Layout";
 import CalendarPage from "./pages/CalendarPage";
 import FinancePage from "./pages/FinancePage";
 import ProjectsPage from "./pages/ProjectsPage";
+import RecordingsPage from "./pages/RecordingsPage";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 function DashboardApp() {
   const [activeTab, setActiveTab] = useState<TabType>('calendar');
-
+  // make sure to consider if you need authentication for certain routes
   return (
     <Layout activeTab={activeTab} onTabChange={setActiveTab}>
       {activeTab === 'calendar' && <CalendarPage />}
       {activeTab === 'finance' && <FinancePage />}
       {activeTab === 'projects' && <ProjectsPage />}
+      {activeTab === 'recordings' && <RecordingsPage />}
     </Layout>
   );
 }
