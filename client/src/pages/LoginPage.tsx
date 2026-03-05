@@ -54,9 +54,20 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     e.preventDefault();
     setError('');
 
-    if (!username.trim() || !password.trim() || !adminPassword.trim()) {
-      setError('모든 필드를 입력해주세요');
-      return;
+    const accounts = getAccounts();
+    const isFirstAccount = Object.keys(accounts).length === 0;
+
+    // 첫 계정은 관리자 비밀번호 필드가 필요 없음
+    if (isFirstAccount) {
+      if (!username.trim() || !password.trim()) {
+        setError('모든 필드를 입력해주세요');
+        return;
+      }
+    } else {
+      if (!username.trim() || !password.trim() || !adminPassword.trim()) {
+        setError('모든 필드를 입력해주세요');
+        return;
+      }
     }
 
     if (username.length < 3) {
@@ -68,11 +79,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       setError('비밀번호는 4자 이상이어야 합니다');
       return;
     }
-
-    const accounts = getAccounts();
-
-    // 첫 번째 계정이면 관리자로 설정
-    const isFirstAccount = Object.keys(accounts).length === 0;
 
     if (!isFirstAccount) {
       // 관리자 비밀번호 확인
