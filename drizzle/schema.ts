@@ -116,3 +116,40 @@ export const customCategoriesRelations = relations(customCategories, ({ one }) =
     references: [users.id],
   }),
 }));
+
+/**
+ * User data storage - 사용자의 모든 로컬 데이터를 JSON으로 저장
+ */
+export const userDataStorage = mysqlTable("userDataStorage", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  dataType: varchar("dataType", { length: 50 }).notNull(), // 'projects', 'finance', 'calendar', 'tasks'
+  data: longtext("data").notNull(), // JSON 형식의 데이터
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type UserDataStorage = typeof userDataStorage.$inferSelect;
+export type InsertUserDataStorage = typeof userDataStorage.$inferInsert;
+
+export const userDataStorageRelations = relations(userDataStorage, ({ one }) => ({
+  user: one(users, {
+    fields: [userDataStorage.userId],
+    references: [users.id],
+  }),
+}));
+
+/**
+ * Admin accounts table - 관리자 계정 정보 저장
+ */
+export const adminAccounts = mysqlTable("adminAccounts", {
+  id: int("id").autoincrement().primaryKey(),
+  username: varchar("username", { length: 100 }).notNull().unique(),
+  passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+  isActive: int("isActive").default(1).notNull(), // 1 = active, 0 = inactive
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AdminAccount = typeof adminAccounts.$inferSelect;
+export type InsertAdminAccount = typeof adminAccounts.$inferInsert;
