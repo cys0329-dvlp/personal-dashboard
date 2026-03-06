@@ -29,35 +29,60 @@ export interface UserData {
   updatedAt: string;
 }
 
+// 간단한 해시 함수 (bcrypt 대신 사용)
+export function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(16);
+}
+
 // 계정 생성
 export async function createAccount(username: string, password: string, isAdmin: boolean = false) {
   try {
-    // 1. Supabase Auth에 사용자 생성
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: `${username}@lifeOS.local`,
-      password: password,
-    });
+    // 1. 사용자명 중복 확인
+    const { data: existingUser, error: checkError } = await supabase
+      .from('user_accounts')
+      .select('id')
+      .eq('username', username)
+      .limit(1);
 
-    if (authError) throw authError;
-    if (!authData.user) throw new Error("Failed to create user");
+    if (checkError && checkError.code !== 'PGRST116') {
+      throw new Error(`Failed to check username: ${checkError.message}`);
+    }
 
-    // 2. 사용자 계정 정보 저장
-    const { error: dbError } = await supabase
+    if (existingUser && existingUser.length > 0) {
+      throw new Error('Username already exists');
+    }
+
+    // 2. 사용자 계정 정보 저장 (비밀번호는 해시하여 저장)
+    const passwordHash = simpleHash(password);
+    const { data: insertData, error: insertError } = await supabase
       .from('user_accounts')
       .insert([
         {
-          id: authData.user.id,
           username: username,
           email: `${username}@lifeOS.local`,
           isAdmin: isAdmin,
+          password_hash: passwordHash, // 비밀번호 해시 저장
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }
-      ]);
+      ])
+      .select();
 
-    if (dbError) throw dbError;
+    if (insertError) {
+      throw new Error(`Failed to create account: ${insertError.message}`);
+    }
 
-    return { success: true, userId: authData.user.id };
+    if (!insertData || insertData.length === 0) {
+      throw new Error("Failed to create user account");
+    }
+
+    return { success: true, userId: insertData[0].id };
   } catch (error) {
     console.error("Error creating account:", error);
     throw error;
@@ -67,15 +92,30 @@ export async function createAccount(username: string, password: string, isAdmin:
 // 계정 로그인
 export async function loginAccount(username: string, password: string) {
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: `${username}@lifeOS.local`,
-      password: password,
-    });
+    // 1. 사용자 조회
+    const { data: accounts, error: queryError } = await supabase
+      .from('user_accounts')
+      .select('*')
+      .eq('username', username)
+      .limit(1);
 
-    if (error) throw error;
-    if (!data.user) throw new Error("Login failed");
+    if (queryError) {
+      throw new Error(`Failed to query account: ${queryError.message}`);
+    }
 
-    return { success: true, userId: data.user.id, session: data.session };
+    if (!accounts || accounts.length === 0) {
+      throw new Error('Invalid username or password');
+    }
+
+    const account = accounts[0];
+
+    // 2. 비밀번호 확인
+    const passwordHash = simpleHash(password);
+    if (account.password_hash !== passwordHash) {
+      throw new Error('Invalid username or password');
+    }
+
+    return { success: true, userId: account.id, username: account.username };
   } catch (error) {
     console.error("Error logging in:", error);
     throw error;
@@ -85,8 +125,7 @@ export async function loginAccount(username: string, password: string) {
 // 로그아웃
 export async function logoutAccount() {
   try {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    // 클라이언트 측에서만 처리 (localStorage 정리)
     return { success: true };
   } catch (error) {
     console.error("Error logging out:", error);
@@ -109,7 +148,7 @@ export async function saveUserData(userId: string, dataType: 'project' | 'lectur
         }
       ]);
 
-    if (error) throw error;
+    if (error) throw new Error(`Failed to save data: ${error.message}`);
     return { success: true };
   } catch (error) {
     console.error("Error saving user data:", error);
@@ -131,7 +170,7 @@ export async function getUserData(userId: string, dataType?: 'project' | 'lectur
 
     const { data, error } = await query;
 
-    if (error) throw error;
+    if (error) throw new Error(`Failed to fetch data: ${error.message}`);
     return { success: true, data: data || [] };
   } catch (error) {
     console.error("Error fetching user data:", error);
@@ -150,7 +189,7 @@ export async function updateUserData(dataId: string, data: Record<string, unknow
       })
       .eq('id', dataId);
 
-    if (error) throw error;
+    if (error) throw new Error(`Failed to update data: ${error.message}`);
     return { success: true };
   } catch (error) {
     console.error("Error updating user data:", error);
@@ -166,7 +205,7 @@ export async function deleteUserData(dataId: string) {
       .delete()
       .eq('id', dataId);
 
-    if (error) throw error;
+    if (error) throw new Error(`Failed to delete data: ${error.message}`);
     return { success: true };
   } catch (error) {
     console.error("Error deleting user data:", error);
@@ -177,23 +216,16 @@ export async function deleteUserData(dataId: string) {
 // 현재 로그인한 사용자 정보 조회
 export async function getCurrentUser() {
   try {
-    const { data, error } = await supabase.auth.getUser();
-    if (error) throw error;
-    return { success: true, user: data.user };
+    const userId = localStorage.getItem('dashboardUserId');
+    const username = localStorage.getItem('dashboardUsername');
+    
+    if (!userId || !username) {
+      return { success: false, user: null };
+    }
+
+    return { success: true, user: { id: userId, username } };
   } catch (error) {
     console.error("Error fetching current user:", error);
-    throw error;
-  }
-}
-
-// 현재 세션 조회
-export async function getCurrentSession() {
-  try {
-    const { data, error } = await supabase.auth.getSession();
-    if (error) throw error;
-    return { success: true, session: data.session };
-  } catch (error) {
-    console.error("Error fetching session:", error);
     throw error;
   }
 }
@@ -205,10 +237,13 @@ export async function getAccountByUsername(username: string) {
       .from('user_accounts')
       .select('*')
       .eq('username', username)
-      .single();
+      .limit(1);
 
-    if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows found
-    return { success: true, account: data || null };
+    if (error && error.code !== 'PGRST116') {
+      throw new Error(`Failed to fetch account: ${error.message}`);
+    }
+    
+    return { success: true, account: (data && data.length > 0) ? data[0] : null };
   } catch (error) {
     console.error("Error fetching account:", error);
     throw error;
@@ -224,11 +259,17 @@ export async function checkAdminExists() {
       .eq('isAdmin', true)
       .limit(1);
 
-    if (error) throw error;
+    if (error && error.code !== 'PGRST116') {
+      console.warn('Admin check warning:', error.message);
+      // 테이블이 없을 수도 있으므로 false 반환
+      return { success: true, exists: false };
+    }
+    
     return { success: true, exists: data && data.length > 0 };
   } catch (error) {
     console.error("Error checking admin:", error);
-    throw error;
+    // 에러 발생 시에도 false 반환하여 첫 계정을 관리자로 생성 가능하게 함
+    return { success: true, exists: false };
   }
 }
 
@@ -240,7 +281,7 @@ export async function deleteAllUserData(userId: string) {
       .delete()
       .eq('userId', userId);
 
-    if (error) throw error;
+    if (error) throw new Error(`Failed to delete all data: ${error.message}`);
     return { success: true };
   } catch (error) {
     console.error("Error deleting all user data:", error);
@@ -255,28 +296,44 @@ export async function migrateDataFromLocalStorage(userId: string, username: stri
     const projectsKey = `${username}_projects`;
     const projectsData = localStorage.getItem(projectsKey);
     if (projectsData) {
-      await saveUserData(userId, 'project', JSON.parse(projectsData));
+      try {
+        await saveUserData(userId, 'project', JSON.parse(projectsData));
+      } catch (err) {
+        console.warn('Failed to migrate projects:', err);
+      }
     }
 
     // 강의 데이터 마이그레이션
     const lecturesKey = `${username}_lectures`;
     const lecturesData = localStorage.getItem(lecturesKey);
     if (lecturesData) {
-      await saveUserData(userId, 'lecture', JSON.parse(lecturesData));
+      try {
+        await saveUserData(userId, 'lecture', JSON.parse(lecturesData));
+      } catch (err) {
+        console.warn('Failed to migrate lectures:', err);
+      }
     }
 
     // 가계부 데이터 마이그레이션
     const financeKey = `${username}_finance`;
     const financeData = localStorage.getItem(financeKey);
     if (financeData) {
-      await saveUserData(userId, 'finance', JSON.parse(financeData));
+      try {
+        await saveUserData(userId, 'finance', JSON.parse(financeData));
+      } catch (err) {
+        console.warn('Failed to migrate finance:', err);
+      }
     }
 
     // 할 일 데이터 마이그레이션
     const tasksKey = `${username}_tasks`;
     const tasksData = localStorage.getItem(tasksKey);
     if (tasksData) {
-      await saveUserData(userId, 'task', JSON.parse(tasksData));
+      try {
+        await saveUserData(userId, 'task', JSON.parse(tasksData));
+      } catch (err) {
+        console.warn('Failed to migrate tasks:', err);
+      }
     }
 
     return { success: true };
