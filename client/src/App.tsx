@@ -12,7 +12,6 @@ import CalendarPage from "./pages/CalendarPage";
 import FinancePage from "./pages/FinancePage";
 import ProjectsPage from "./pages/ProjectsPage";
 import LecturesPage from "./pages/LecturesPage";
-import DataSyncPage from "./pages/DataSyncPage";
 import LoginPage from "./pages/LoginPage";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { toast } from "sonner";
@@ -64,7 +63,6 @@ function DashboardApp() {
         {activeTab === 'finance' && <FinancePage />}
         {activeTab === 'projects' && <ProjectsPage />}
         {activeTab === 'lectures' && <LecturesPage />}
-        {activeTab === 'sync' && <DataSyncPage username={username} />}
       </Layout>
     </DashboardProvider>
   );

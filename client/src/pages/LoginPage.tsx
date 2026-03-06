@@ -124,10 +124,10 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl font-bold text-white">OS</span>
+            <span className="text-2xl font-bold text-white">MY</span>
           </div>
           <h1 className="text-3xl font-bold mb-2" style={{ color: 'oklch(0.22 0.04 50)' }}>
-            Life-OS
+            My Dashboard
           </h1>
           <p className="text-muted-foreground">개인 맞춤 대시보드</p>
         </div>

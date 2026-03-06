@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { CalendarDays, Wallet, FolderKanban, Mic, Menu, X, BookOpen, Settings, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type TabType = 'calendar' | 'finance' | 'projects' | 'lectures' | 'sync';
+export type TabType = 'calendar' | 'finance' | 'projects' | 'lectures';
 
 interface LayoutProps {
   activeTab: TabType;
@@ -23,7 +23,6 @@ const navItems = [
   { id: 'finance' as TabType, label: '가계부', icon: Wallet },
   { id: 'projects' as TabType, label: '프로젝트', icon: FolderKanban },
   { id: 'lectures' as TabType, label: '강의 관리', icon: BookOpen },
-  { id: 'sync' as TabType, label: '데이터 동기화', icon: Settings },
 ];
 
 export default function Layout({ activeTab, onTabChange, children, username, onLogout }: LayoutProps) {
