@@ -60,11 +60,11 @@ export interface UserData {
 
 // 간단한 해시 함수 (bcrypt 대신 사용)
 export function simpleHash(str: string): string {
-  let hash = 0;
+  // 더 안정적인 해시 함수
+  let hash = 5381;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash = ((hash << 5) + hash) + char; // hash * 33 + c
   }
   return Math.abs(hash).toString(16);
 }
@@ -198,7 +198,7 @@ export async function getUserData(userId: string, dataType?: 'project' | 'lectur
     let query = client
       .from('user_data')
       .select('*')
-      .eq('userId', userId);
+      .eq('userid', userId);
 
     if (dataType) {
       query = query.eq('dataType', dataType);
