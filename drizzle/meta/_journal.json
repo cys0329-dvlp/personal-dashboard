@@ -22,6 +22,20 @@
       "when": 1772727474367,
       "tag": "0002_great_lilandra",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1772761980811,
+      "tag": "0003_tranquil_ultimates",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1772775697046,
+      "tag": "0004_opposite_cobalt_man",
+      "breakpoints": true
     }
   ]
 }

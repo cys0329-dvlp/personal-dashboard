@@ -15,6 +15,7 @@ import LecturesPage from "./pages/LecturesPage";
 import LoginPage from "./pages/LoginPage";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { toast } from "sonner";
+import { migrateDataFromLocalStorage } from "./lib/supabase";
 
 function DashboardApp() {
   const [activeTab, setActiveTab] = useState<TabType>('calendar');
@@ -31,29 +32,34 @@ function DashboardApp() {
     }
   }, []);
 
-  const handleLogin = (inputUsername: string, inputPassword: string) => {
-    // 간단한 로그인 검증 (실제로는 백엔드에서 검증해야 함)
-    if (inputUsername.trim() && inputPassword.trim()) {
-      localStorage.setItem('dashboardUsername', inputUsername);
-      localStorage.setItem('dashboardPassword', inputPassword);
-      setUsername(inputUsername);
-      setIsLoggedIn(true);
-      toast.success('로그인 성공!');
-    } else {
-      toast.error('아이디와 비밀번호가 일치하지 않습니다');
+  const handleLogin = async (inputUsername: string, userId: string) => {
+    // Supabase 로그인 완료 후 호출됨
+    localStorage.setItem('dashboardUsername', inputUsername);
+    localStorage.setItem('dashboardUserId', userId);
+    setUsername(inputUsername);
+    
+    // localStorage에서 Supabase로 데이터 마이그레이션
+    try {
+      await migrateDataFromLocalStorage(userId, inputUsername);
+      toast.success('데이터 동기화 완료');
+    } catch (error) {
+      console.error('데이터 마이그레이션 실패:', error);
+      toast.error('데이터 동기화 중 오류 발생');
     }
+    
+    setIsLoggedIn(true);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('dashboardUsername');
-    localStorage.removeItem('dashboardPassword');
+    localStorage.removeItem('dashboardUserId');
     setUsername('');
     setIsLoggedIn(false);
     toast.success('로그아웃 되었습니다');
   };
 
   if (!isLoggedIn) {
-    return <LoginPage onLogin={handleLogin} />;
+    return <LoginPage onLogin={(username, userId) => handleLogin(username, userId)} />;
   }
 
   return (
