@@ -1,26 +1,29 @@
 // ============================================================
-// Schedule Calendar - 주간 시간표 (카테고리 색상 기능 포함)
+// Schedule Calendar - 주간 시간표 (직접 색상 지정 기능)
 // 강의, 알바 등 시간 정보를 시간표 형식으로 표시
 // 모바일 최적화 완료
 // ============================================================
 
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Trash2, Repeat2, Palette } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Repeat2 } from 'lucide-react';
 import { useDashboard } from '@/contexts/DashboardContext';
 import { DAY_NAMES, MONTH_NAMES, today } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import { SCHEDULE_COLOR_PRESETS } from '@/lib/types';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 type FormMode = 'single' | 'repeat';
 
 export default function ScheduleCalendar() {
-  const { schedules, addSchedule, deleteSchedule, scheduleCategories } = useDashboard();
+  const { schedules, addSchedule, deleteSchedule } = useDashboard();
   const [viewDate, setViewDate] = useState(today());
   const [showAddForm, setShowAddForm] = useState(false);
   const [formMode, setFormMode] = useState<FormMode>('single');
   const [selectedDateForAdd, setSelectedDateForAdd] = useState<string | null>(null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedColor, setSelectedColor] = useState<string>(SCHEDULE_COLOR_PRESETS[0]);
+  const [useCustomColor, setUseCustomColor] = useState(false);
+  const [customColor, setCustomColor] = useState<string>('#3b82f6');
   const [formData, setFormData] = useState({
     title: '',
     type: 'lecture' as const,
@@ -35,18 +38,9 @@ export default function ScheduleCalendar() {
     daysOfWeek: [1, 2, 3, 4, 5], // Mon-Fri by default
   });
 
-  // Get category color
-  const getCategoryColor = (categoryId?: string) => {
-    if (categoryId && scheduleCategories[categoryId]) {
-      return scheduleCategories[categoryId].color;
-    }
-    // Fallback to type-based color
-    const typeColors: Record<string, string> = {
-      lecture: '#3b82f6',
-      work: '#ef4444',
-      event: '#8b5cf6',
-    };
-    return typeColors[formData.type] || '#6b7280';
+  // Get final color
+  const getFinalColor = () => {
+    return useCustomColor ? customColor : selectedColor;
   };
 
   // ---- 날짜 계산 함수 ----
@@ -99,7 +93,7 @@ export default function ScheduleCalendar() {
 
     const start = new Date(repeatData.startDate);
     const end = new Date(repeatData.endDate);
-    const categoryColor = getCategoryColor(selectedCategoryId);
+    const finalColor = getFinalColor();
 
     const schedulesToAdd = [];
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -114,8 +108,7 @@ export default function ScheduleCalendar() {
           endTime: formData.endTime,
           location: formData.location,
           description: formData.description,
-          color: categoryColor,
-          category: selectedCategoryId,
+          color: finalColor,
         });
       }
     }
@@ -132,13 +125,12 @@ export default function ScheduleCalendar() {
       return;
     }
 
-    const categoryColor = getCategoryColor(selectedCategoryId);
+    const finalColor = getFinalColor();
 
     addSchedule({
       ...formData,
       date: selectedDateForAdd || viewDate,
-      color: categoryColor,
-      category: selectedCategoryId,
+      color: finalColor,
     });
 
     resetForm();
@@ -158,7 +150,9 @@ export default function ScheduleCalendar() {
       endDate: today(),
       daysOfWeek: [1, 2, 3, 4, 5],
     });
-    setSelectedCategoryId('');
+    setSelectedColor(SCHEDULE_COLOR_PRESETS[0]);
+    setUseCustomColor(false);
+    setCustomColor('#3b82f6');
     setShowAddForm(false);
     setSelectedDateForAdd(null);
     setFormMode('single');
@@ -183,13 +177,6 @@ export default function ScheduleCalendar() {
     const endDate = new Date(weekDates[6]);
     return `${startDate.getMonth() + 1}월 ${startDate.getDate()}일 - ${endDate.getMonth() + 1}월 ${endDate.getDate()}일`;
   };
-
-  // Get category list for current type
-  const categoriesForType = useMemo(() => {
-    return Object.values(scheduleCategories).filter(
-      cat => !cat.type || cat.type === formData.type
-    );
-  }, [scheduleCategories, formData.type]);
 
   return (
     <div className="w-full">
@@ -276,10 +263,7 @@ export default function ScheduleCalendar() {
 
             <select
               value={formData.type}
-              onChange={(e) => {
-                setFormData({ ...formData, type: e.target.value as any });
-                setSelectedCategoryId(''); // Reset category when type changes
-              }}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
               className="w-full px-3 py-2 border border-gray-300 rounded text-sm md:text-base"
             >
               <option value="lecture">강의</option>
@@ -287,37 +271,56 @@ export default function ScheduleCalendar() {
               <option value="event">이벤트</option>
             </select>
 
-            {/* 카테고리 색상 선택 */}
-            {categoriesForType.length > 0 && (
-              <div className="bg-white p-3 rounded border border-gray-300">
-                <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                  <Palette className="w-4 h-4" />
-                  카테고리 색상
-                </label>
-                <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
-                  {categoriesForType.map(category => (
+            {/* 색상 선택 */}
+            <div className="bg-white p-3 rounded border border-gray-300">
+              <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2">
+                색상 선택
+              </label>
+              <div className="space-y-2">
+                {/* 프리셋 색상 */}
+                <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
+                  {SCHEDULE_COLOR_PRESETS.map(color => (
                     <button
-                      key={category.id}
-                      onClick={() => setSelectedCategoryId(category.id)}
-                      className={`p-3 rounded border-2 transition-all ${
-                        selectedCategoryId === category.id
+                      key={color}
+                      onClick={() => {
+                        setSelectedColor(color);
+                        setUseCustomColor(false);
+                      }}
+                      className={`w-8 h-8 md:w-10 md:h-10 rounded border-2 transition-all ${
+                        !useCustomColor && selectedColor === color
                           ? 'border-gray-800 ring-2 ring-offset-1'
                           : 'border-gray-300 hover:border-gray-500'
                       }`}
-                      style={{
-                        backgroundColor: category.color,
-                        opacity: selectedCategoryId === category.id ? 1 : 0.7,
-                      }}
-                      title={category.name}
-                    >
-                      <span className="text-xs font-semibold text-white drop-shadow">
-                        {category.name.substring(0, 2)}
-                      </span>
-                    </button>
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
                   ))}
                 </div>
+
+                {/* 커스텀 색상 */}
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={customColor}
+                    onChange={(e) => {
+                      setCustomColor(e.target.value);
+                      setUseCustomColor(true);
+                    }}
+                    className="w-10 h-10 rounded cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={customColor}
+                    onChange={(e) => {
+                      setCustomColor(e.target.value);
+                      setUseCustomColor(true);
+                    }}
+                    placeholder="#3b82f6"
+                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs md:text-sm font-mono"
+                  />
+                </div>
               </div>
-            )}
+            </div>
 
             <div className="grid grid-cols-2 gap-2">
               <input

@@ -4,7 +4,7 @@
 // ============================================================
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { Transaction, Project, Task, Schedule, IncomeAllocation, ScheduleCategory, ScheduleCategoryMap, DEFAULT_SCHEDULE_COLORS } from '@/lib/types';
+import { Transaction, Project, Task, Schedule, IncomeAllocation } from '@/lib/types';
 import {
   loadTransactions, saveTransactions,
   loadProjects, saveProjects,
@@ -45,13 +45,6 @@ interface DashboardContextType {
   incomeAllocations: IncomeAllocation[];
   setIncomeAllocation: (month: string, allocation: Omit<IncomeAllocation, 'id' | 'createdAt' | 'updatedAt'>) => void;
   getIncomeAllocation: (month: string) => IncomeAllocation | undefined;
-
-  // Schedule Categories (일정 카테고리)
-  scheduleCategories: ScheduleCategoryMap;
-  addScheduleCategory: (category: Omit<ScheduleCategory, 'id'>) => void;
-  updateScheduleCategory: (id: string, category: Partial<ScheduleCategory>) => void;
-  deleteScheduleCategory: (id: string) => void;
-  getScheduleCategory: (id: string) => ScheduleCategory | undefined;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -83,28 +76,6 @@ export function DashboardProvider({
   const [deletedProjects, setDeletedProjects] = useState<Project[]>(() => initialDeletedProjects || loadDeletedProjects(username));
   const [schedules, setSchedules] = useState<Schedule[]>(() => initialSchedules || []);
   const [incomeAllocations, setIncomeAllocations] = useState<IncomeAllocation[]>(() => initialIncomeAllocations || []);
-  const [scheduleCategories, setScheduleCategories] = useState<ScheduleCategoryMap>(() => {
-    const stored = localStorage.getItem(`scheduleCategories_${username}`);
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (e) {
-        console.error('Failed to parse schedule categories:', e);
-      }
-    }
-    // Initialize with default categories
-    const defaults: ScheduleCategoryMap = {};
-    Object.entries(DEFAULT_SCHEDULE_COLORS).forEach(([type, color]) => {
-      const id = `default_${type}`;
-      defaults[id] = {
-        id,
-        name: type === 'lecture' ? '강의' : type === 'work' ? '알바/일' : '이벤트',
-        color,
-        type: type as any,
-      };
-    });
-    return defaults;
-  });
 
   // Persist on change
   useEffect(() => { saveTransactions(transactions, username); }, [transactions, username]);
@@ -113,7 +84,6 @@ export function DashboardProvider({
   useEffect(() => { saveDeletedProjects(deletedProjects, username); }, [deletedProjects, username]);
   useEffect(() => { localStorage.setItem(`schedules_${username}`, JSON.stringify(schedules)); }, [schedules, username]);
   useEffect(() => { localStorage.setItem(`incomeAllocations_${username}`, JSON.stringify(incomeAllocations)); }, [incomeAllocations, username]);
-  useEffect(() => { localStorage.setItem(`scheduleCategories_${username}`, JSON.stringify(scheduleCategories)); }, [scheduleCategories, username]);
 
   // ---- Transactions ----
   const addTransaction = useCallback((t: Omit<Transaction, 'id' | 'createdAt'>) => {
@@ -212,34 +182,6 @@ export function DashboardProvider({
     return incomeAllocations.find(ia => ia.month === month);
   }, [incomeAllocations]);
 
-  // ---- Schedule Categories ----
-  const addScheduleCategory = useCallback((category: Omit<ScheduleCategory, 'id'>) => {
-    const id = generateId();
-    setScheduleCategories(prev => ({
-      ...prev,
-      [id]: { ...category, id },
-    }));
-  }, []);
-
-  const updateScheduleCategory = useCallback((id: string, category: Partial<ScheduleCategory>) => {
-    setScheduleCategories(prev => ({
-      ...prev,
-      [id]: { ...prev[id], ...category },
-    }));
-  }, []);
-
-  const deleteScheduleCategory = useCallback((id: string) => {
-    setScheduleCategories(prev => {
-      const newCategories = { ...prev };
-      delete newCategories[id];
-      return newCategories;
-    });
-  }, []);
-
-  const getScheduleCategory = useCallback((id: string) => {
-    return scheduleCategories[id];
-  }, [scheduleCategories]);
-
   return (
     <DashboardContext.Provider value={{
       transactions, addTransaction, updateTransaction, deleteTransaction,
@@ -248,7 +190,6 @@ export function DashboardProvider({
       tasks, addTask, updateTask, deleteTask, toggleTask,
       schedules, addSchedule, updateSchedule, deleteSchedule,
       incomeAllocations, setIncomeAllocation: setIncomeAllocationFn, getIncomeAllocation,
-      scheduleCategories, addScheduleCategory, updateScheduleCategory, deleteScheduleCategory, getScheduleCategory,
     }}>
       {children}
     </DashboardContext.Provider>

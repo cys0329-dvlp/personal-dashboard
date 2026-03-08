@@ -93,31 +93,29 @@ export interface Schedule {
   endTime: string; // HH:mm
   location?: string;
   description?: string;
-  color?: string;
-  category?: string; // 커스텀 카테고리
+  color?: string; // 사용자가 직접 지정한 색상
   createdAt: string;
 }
 
-// ---- Schedule Category Colors ----
+// ---- Schedule Color Presets ----
+export const SCHEDULE_COLOR_PRESETS = [
+  '#3b82f6', // Blue
+  '#ef4444', // Red
+  '#10b981', // Green
+  '#f59e0b', // Amber
+  '#8b5cf6', // Purple
+  '#06b6d4', // Cyan
+  '#ec4899', // Pink
+  '#6b7280', // Gray
+  '#14b8a6', // Teal
+  '#f97316', // Orange
+] as const;
+
 export const DEFAULT_SCHEDULE_COLORS: Record<ScheduleType, string> = {
   'lecture': '#3b82f6',  // Blue
   'work': '#ef4444',     // Red
   'event': '#8b5cf6',    // Purple
 };
-
-export interface ScheduleCategory {
-  id: string;
-  name: string;
-  color: string;
-  type?: 'lecture' | 'work' | 'event';
-}
-
-export type ScheduleCategoryMap = Record<string, ScheduleCategory>;
-
-// ---- Schedule Category Management ----
-export interface ScheduleCategorySettings {
-  categories: ScheduleCategoryMap;
-}
 
 // ---- Income Allocation (월별 수입 배분) ----
 export interface IncomeAllocation {
