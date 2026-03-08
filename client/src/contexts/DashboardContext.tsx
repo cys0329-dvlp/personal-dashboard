@@ -4,7 +4,7 @@
 // ============================================================
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { Transaction, Project, Task } from '@/lib/types';
+import { Transaction, Project, Task, Schedule, IncomeAllocation } from '@/lib/types';
 import {
   loadTransactions, saveTransactions,
   loadProjects, saveProjects,
@@ -34,6 +34,17 @@ interface DashboardContextType {
   updateTask: (id: string, t: Partial<Task>) => void;
   deleteTask: (id: string) => void;
   toggleTask: (id: string) => void;
+
+  // Schedules (일정)
+  schedules: Schedule[];
+  addSchedule: (s: Omit<Schedule, 'id' | 'createdAt'>) => void;
+  updateSchedule: (id: string, s: Partial<Schedule>) => void;
+  deleteSchedule: (id: string) => void;
+
+  // Income Allocation (월별 수입 배분)
+  incomeAllocations: IncomeAllocation[];
+  setIncomeAllocation: (month: string, allocation: Omit<IncomeAllocation, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  getIncomeAllocation: (month: string) => IncomeAllocation | undefined;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -45,19 +56,34 @@ interface DashboardProviderProps {
   initialProjects?: Project[];
   initialTasks?: Task[];
   initialDeletedProjects?: Project[];
+  initialSchedules?: Schedule[];
+  initialIncomeAllocations?: IncomeAllocation[];
 }
 
-export function DashboardProvider({ children, username, initialTransactions, initialProjects, initialTasks, initialDeletedProjects }: DashboardProviderProps) {
+export function DashboardProvider({ 
+  children, 
+  username, 
+  initialTransactions, 
+  initialProjects, 
+  initialTasks, 
+  initialDeletedProjects,
+  initialSchedules,
+  initialIncomeAllocations,
+}: DashboardProviderProps) {
   const [transactions, setTransactions] = useState<Transaction[]>(() => initialTransactions || loadTransactions(username));
   const [projects, setProjects] = useState<Project[]>(() => initialProjects || loadProjects(username));
   const [tasks, setTasks] = useState<Task[]>(() => initialTasks || loadTasks(username));
   const [deletedProjects, setDeletedProjects] = useState<Project[]>(() => initialDeletedProjects || loadDeletedProjects(username));
+  const [schedules, setSchedules] = useState<Schedule[]>(() => initialSchedules || []);
+  const [incomeAllocations, setIncomeAllocations] = useState<IncomeAllocation[]>(() => initialIncomeAllocations || []);
 
   // Persist on change
   useEffect(() => { saveTransactions(transactions, username); }, [transactions, username]);
   useEffect(() => { saveProjects(projects, username); }, [projects, username]);
   useEffect(() => { saveTasks(tasks, username); }, [tasks, username]);
   useEffect(() => { saveDeletedProjects(deletedProjects, username); }, [deletedProjects, username]);
+  useEffect(() => { localStorage.setItem(`schedules_${username}`, JSON.stringify(schedules)); }, [schedules, username]);
+  useEffect(() => { localStorage.setItem(`incomeAllocations_${username}`, JSON.stringify(incomeAllocations)); }, [incomeAllocations, username]);
 
   // ---- Transactions ----
   const addTransaction = useCallback((t: Omit<Transaction, 'id' | 'createdAt'>) => {
@@ -121,12 +147,49 @@ export function DashboardProvider({ children, username, initialTransactions, ini
     setTasks(prev => prev.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
   }, []);
 
+  // ---- Schedules ----
+  const addSchedule = useCallback((s: Omit<Schedule, 'id' | 'createdAt'>) => {
+    const newS: Schedule = { ...s, id: generateId(), createdAt: new Date().toISOString() };
+    setSchedules(prev => [newS, ...prev]);
+  }, []);
+
+  const updateSchedule = useCallback((id: string, s: Partial<Schedule>) => {
+    setSchedules(prev => prev.map(item => item.id === id ? { ...item, ...s } : item));
+  }, []);
+
+  const deleteSchedule = useCallback((id: string) => {
+    setSchedules(prev => prev.filter(item => item.id !== id));
+  }, []);
+
+  // ---- Income Allocation ----
+  const setIncomeAllocationFn = useCallback((month: string, allocation: Omit<IncomeAllocation, 'id' | 'createdAt' | 'updatedAt'>) => {
+    setIncomeAllocations(prev => {
+      const existing = prev.find(ia => ia.month === month);
+      if (existing) {
+        return prev.map(ia => ia.month === month ? { ...ia, ...allocation, updatedAt: new Date().toISOString() } : ia);
+      }
+      const newIA: IncomeAllocation = {
+        ...allocation,
+        id: generateId(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      return [newIA, ...prev];
+    });
+  }, []);
+
+  const getIncomeAllocation = useCallback((month: string) => {
+    return incomeAllocations.find(ia => ia.month === month);
+  }, [incomeAllocations]);
+
   return (
     <DashboardContext.Provider value={{
       transactions, addTransaction, updateTransaction, deleteTransaction,
       projects, addProject, updateProject, completeProject,
       deletedProjects, restoreProject,
       tasks, addTask, updateTask, deleteTask, toggleTask,
+      schedules, addSchedule, updateSchedule, deleteSchedule,
+      incomeAllocations, setIncomeAllocation: setIncomeAllocationFn, getIncomeAllocation,
     }}>
       {children}
     </DashboardContext.Provider>

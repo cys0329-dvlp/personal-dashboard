@@ -35,13 +35,15 @@ export type ProjectStatus = 'todo' | 'inprogress' | 'done';
 
 export interface Task {
   id: string;
-  projectId: string;
+  projectId?: string;
   title: string;
   dueDate?: string; // YYYY-MM-DD
   dueTime?: string; // HH:mm
   completed: boolean;
   category?: string;
   detail?: string;
+  priority?: 'low' | 'medium' | 'high';
+  showInCalendar?: boolean; // 캘린더에 표시할지 여부
   createdAt: string;
 }
 
@@ -57,14 +59,65 @@ export interface Project {
   deletedAt?: string;  // soft delete for 완료 복구
 }
 
+// ---- Category Colors ----
+export const CATEGORY_COLORS: Record<TransactionCategory, string> = {
+  // Income
+  '급여': '#10b981',
+  '부업': '#06b6d4',
+  '투자수익': '#f59e0b',
+  '용돈': '#8b5cf6',
+  '환급': '#ec4899',
+  '기타수입': '#6b7280',
+  // Expense
+  '식비': '#ef4444',
+  '교통': '#f97316',
+  '쇼핑': '#ec4899',
+  '문화/여가': '#8b5cf6',
+  '의료/건강': '#06b6d4',
+  '통신': '#3b82f6',
+  '주거/관리비': '#f59e0b',
+  '교육': '#10b981',
+  '저축/투자': '#06b6d4',
+  '기타지출': '#6b7280',
+};
+
+// ---- Schedule (일정) ----
+export type ScheduleType = 'lecture' | 'work' | 'event';
+
+export interface Schedule {
+  id: string;
+  title: string;
+  type: ScheduleType;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  location?: string;
+  description?: string;
+  color?: string;
+  createdAt: string;
+}
+
+// ---- Income Allocation (월별 수입 배분) ----
+export interface IncomeAllocation {
+  id: string;
+  month: string; // YYYY-MM
+  categories: {
+    [key: string]: number; // 카테고리: 퍼센테이지
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ---- Calendar ----
 export interface CalendarEvent {
   id: string;
-  sourceType: 'transaction' | 'task';
+  sourceType: 'transaction' | 'task' | 'schedule';
   sourceId: string;
   date: string;
   title: string;
   color: string;
   amount?: number;
   transactionType?: TransactionType;
+  startTime?: string;
+  endTime?: string;
 }
