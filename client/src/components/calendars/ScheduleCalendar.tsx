@@ -1,29 +1,30 @@
 // ============================================================
-// Schedule Calendar - 주간 시간표 (직접 색상 지정 기능)
-// 강의, 알바 등 시간 정보를 시간표 형식으로 표시
-// 모바일 최적화 완료
+// Schedule Calendar - 컴팩트 모바일 시간표 뷰
+// 작은 칸 크기로 모바일 한 화면에 모든 시간대 표시
 // ============================================================
 
-import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Trash2, Repeat2 } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { useDashboard } from '@/contexts/DashboardContext';
-import { DAY_NAMES, MONTH_NAMES, today } from '@/lib/utils';
+import { DAY_NAMES, today } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { SCHEDULE_COLOR_PRESETS } from '@/lib/types';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
-
-type FormMode = 'single' | 'repeat';
+const HOUR_HEIGHT = 40; // 작은 칸 크기 (px)
 
 export default function ScheduleCalendar() {
   const { schedules, addSchedule, deleteSchedule } = useDashboard();
-  const [viewDate, setViewDate] = useState(today());
+  
+  // 상태
+  const [currentDate, setCurrentDate] = useState(today());
   const [showAddForm, setShowAddForm] = useState(false);
-  const [formMode, setFormMode] = useState<FormMode>('single');
-  const [selectedDateForAdd, setSelectedDateForAdd] = useState<string | null>(null);
+  const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const [selectedColor, setSelectedColor] = useState<string>(SCHEDULE_COLOR_PRESETS[0]);
   const [useCustomColor, setUseCustomColor] = useState(false);
   const [customColor, setCustomColor] = useState<string>('#3b82f6');
+  const [currentTime, setCurrentTime] = useState(new Date());
+
   const [formData, setFormData] = useState({
     title: '',
     type: 'lecture' as const,
@@ -32,18 +33,14 @@ export default function ScheduleCalendar() {
     location: '',
     description: '',
   });
-  const [repeatData, setRepeatData] = useState({
-    startDate: today(),
-    endDate: today(),
-    daysOfWeek: [1, 2, 3, 4, 5], // Mon-Fri by default
-  });
 
-  // Get final color
-  const getFinalColor = () => {
-    return useCustomColor ? customColor : selectedColor;
-  };
+  // 현재 시간 업데이트 (1분마다)
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
-  // ---- 날짜 계산 함수 ----
+  // 주간 날짜 계산
   const getWeekDates = (dateStr: string): string[] => {
     const date = new Date(dateStr);
     const day = date.getDay();
@@ -59,9 +56,9 @@ export default function ScheduleCalendar() {
     return dates;
   };
 
-  const weekDates = useMemo(() => getWeekDates(viewDate), [viewDate]);
+  const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate]);
 
-  // ---- 일정 필터링 ----
+  // 주간 일정 필터링
   const weekSchedules = useMemo(() => {
     return schedules
       .filter(s => weekDates.includes(s.date))
@@ -71,54 +68,19 @@ export default function ScheduleCalendar() {
       });
   }, [schedules, weekDates]);
 
-  // ---- 네비게이션 ----
-  const prevWeek = () => {
-    const d = new Date(viewDate);
-    d.setDate(d.getDate() - 7);
-    setViewDate(d.toISOString().split('T')[0]);
+  // 월 변경
+  const changeMonth = (offset: number) => {
+    const d = new Date(currentDate);
+    d.setMonth(d.getMonth() + offset);
+    setCurrentDate(d.toISOString().split('T')[0]);
   };
 
-  const nextWeek = () => {
-    const d = new Date(viewDate);
-    d.setDate(d.getDate() + 7);
-    setViewDate(d.toISOString().split('T')[0]);
+  // 색상 선택
+  const getFinalColor = () => {
+    return useCustomColor ? customColor : selectedColor;
   };
 
-  // ---- 반복 일정 생성 ----
-  const generateRepeatSchedules = () => {
-    if (!formData.title || !formData.startTime || !formData.endTime) {
-      alert('필수 정보를 입력해주세요');
-      return;
-    }
-
-    const start = new Date(repeatData.startDate);
-    const end = new Date(repeatData.endDate);
-    const finalColor = getFinalColor();
-
-    const schedulesToAdd = [];
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dayOfWeek = d.getDay();
-      if (repeatData.daysOfWeek.includes(dayOfWeek)) {
-        const dateStr = d.toISOString().split('T')[0];
-        schedulesToAdd.push({
-          date: dateStr,
-          title: formData.title,
-          type: formData.type,
-          startTime: formData.startTime,
-          endTime: formData.endTime,
-          location: formData.location,
-          description: formData.description,
-          color: finalColor,
-        });
-      }
-    }
-
-    schedulesToAdd.forEach(s => addSchedule(s));
-    alert(`${schedulesToAdd.length}개의 일정이 추가되었습니다.`);
-    resetForm();
-  };
-
-  // ---- 단일 일정 추가 ----
+  // 일정 추가
   const handleAddSchedule = () => {
     if (!formData.title || !formData.startTime || !formData.endTime) {
       alert('필수 정보를 입력해주세요');
@@ -129,7 +91,7 @@ export default function ScheduleCalendar() {
 
     addSchedule({
       ...formData,
-      date: selectedDateForAdd || viewDate,
+      date: currentDate,
       color: finalColor,
     });
 
@@ -145,140 +107,159 @@ export default function ScheduleCalendar() {
       location: '',
       description: '',
     });
-    setRepeatData({
-      startDate: today(),
-      endDate: today(),
-      daysOfWeek: [1, 2, 3, 4, 5],
-    });
     setSelectedColor(SCHEDULE_COLOR_PRESETS[0]);
     setUseCustomColor(false);
     setCustomColor('#3b82f6');
     setShowAddForm(false);
-    setSelectedDateForAdd(null);
-    setFormMode('single');
+    setSelectedHour(null);
   };
 
-  // ---- 위치/높이 계산 ----
+  // 위치/높이 계산
   const getSchedulePosition = (startTime: string) => {
     const [hours, mins] = startTime.split(':').map(Number);
-    return (hours + mins / 60) * 60;
+    return (hours + mins / 60) * HOUR_HEIGHT;
   };
 
   const getScheduleHeight = (startTime: string, endTime: string) => {
     const [sh, sm] = startTime.split(':').map(Number);
     const [eh, em] = endTime.split(':').map(Number);
     const duration = (eh + em / 60) - (sh + sm / 60);
-    return Math.max(duration * 60, 30);
+    return Math.max(duration * HOUR_HEIGHT, 20);
   };
 
-  // ---- 주간 뷰 헤더 ----
-  const getWeekHeader = () => {
-    const startDate = new Date(weekDates[0]);
-    const endDate = new Date(weekDates[6]);
-    return `${startDate.getMonth() + 1}월 ${startDate.getDate()}일 - ${endDate.getMonth() + 1}월 ${endDate.getDate()}일`;
+  // 현재 시간 위치
+  const getCurrentTimePosition = () => {
+    const hours = currentTime.getHours();
+    const mins = currentTime.getMinutes();
+    return (hours + mins / 60) * HOUR_HEIGHT;
+  };
+
+  // 현재 시간 포맷
+  const getCurrentTimeString = () => {
+    return `${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')}`;
+  };
+
+  // 월 표시
+  const getMonthDisplay = () => {
+    const d = new Date(currentDate);
+    return `${d.getMonth() + 1}월`;
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full h-screen flex flex-col bg-white">
       {/* ---- 헤더 ---- */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
-        {/* 네비게이션 */}
-        <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 bg-white sticky top-0 z-10">
+        <div className="flex items-center gap-2">
           <button
-            onClick={prevWeek}
-            className="p-2 hover:bg-gray-100 rounded flex-shrink-0"
+            onClick={() => changeMonth(-1)}
+            className="p-1 hover:bg-gray-100 rounded"
           >
-            <ChevronLeft className="w-5 h-5 md:w-6 md:h-6 text-blue-700" />
+            <ChevronLeft className="w-5 h-5 text-gray-700" />
           </button>
 
-          <div className="text-center flex-1 md:flex-none min-w-48">
-            <h2 className="text-lg md:text-2xl font-bold text-blue-900">주간 일정</h2>
-            <p className="text-xs md:text-sm text-blue-700">{getWeekHeader()}</p>
-          </div>
+          <span className="text-sm font-semibold text-gray-800 min-w-12">
+            {getMonthDisplay()}
+          </span>
 
           <button
-            onClick={nextWeek}
-            className="p-2 hover:bg-gray-100 rounded flex-shrink-0"
+            onClick={() => changeMonth(1)}
+            className="p-1 hover:bg-gray-100 rounded"
           >
-            <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-blue-700" />
+            <ChevronRight className="w-5 h-5 text-gray-700" />
           </button>
         </div>
 
-        {/* 오늘/추가 버튼 */}
-        <div className="flex gap-2 w-full md:w-auto">
-          <button
-            onClick={() => setViewDate(today())}
-            className="flex-1 md:flex-none px-3 md:px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-semibold text-sm md:text-base"
-          >
-            오늘
-          </button>
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold text-sm md:text-base"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden md:inline">일정 추가</span>
-            <span className="md:hidden">추가</span>
-          </button>
-        </div>
+        <button
+          onClick={() => setCurrentDate(today())}
+          className="px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded"
+        >
+          오늘
+        </button>
       </div>
 
-      {/* ---- 일정 추가 폼 ---- */}
+      {/* ---- 요일 헤더 ---- */}
+      <div className="flex border-b border-gray-200 bg-blue-50 sticky top-12 z-10">
+        <div className="w-10 flex-shrink-0"></div>
+        {weekDates.map((date, idx) => {
+          const d = new Date(date);
+          const isToday = date === today();
+          return (
+            <div
+              key={date}
+              className="flex-1 text-center py-1.5 border-r border-gray-200 text-xs"
+            >
+              <div className="font-semibold text-gray-600">
+                {DAY_NAMES[d.getDay()]}
+              </div>
+              <div
+                className={cn(
+                  'text-sm font-bold mt-0.5',
+                  isToday
+                    ? 'w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center mx-auto'
+                    : 'text-gray-900'
+                )}
+              >
+                {d.getDate()}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ---- 일정 추가 폼 (모달) ---- */}
       {showAddForm && (
-        <div className="bg-blue-50 p-3 md:p-4 rounded-lg mb-4 border border-blue-200 overflow-y-auto max-h-96 md:max-h-none">
-          {/* 모드 선택 */}
-          <div className="flex gap-2 mb-4">
-            <button
-              onClick={() => setFormMode('single')}
-              className={`flex-1 px-3 py-2 rounded text-sm font-semibold transition-all ${
-                formMode === 'single'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-blue-700 border border-blue-300'
-              }`}
-            >
-              한 번만
-            </button>
-            <button
-              onClick={() => setFormMode('repeat')}
-              className={`flex-1 px-3 py-2 rounded text-sm font-semibold transition-all flex items-center justify-center gap-1 ${
-                formMode === 'repeat'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-blue-700 border border-blue-300'
-              }`}
-            >
-              <Repeat2 className="w-4 h-4" />
-              반복
-            </button>
-          </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center z-50">
+          <div className="bg-white w-full md:w-96 rounded-t-2xl md:rounded-2xl p-4 max-h-96 overflow-y-auto">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">일정 추가</h3>
 
-          <div className="space-y-3">
-            {/* 기본 정보 */}
-            <input
-              type="text"
-              placeholder="일정 제목 (예: 데이터베이스 강의)"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded text-sm md:text-base"
-            />
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="일정 제목"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+              />
 
-            <select
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-              className="w-full px-3 py-2 border border-gray-300 rounded text-sm md:text-base"
-            >
-              <option value="lecture">강의</option>
-              <option value="work">알바/일</option>
-              <option value="event">이벤트</option>
-            </select>
+              <select
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+                className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+              >
+                <option value="lecture">강의</option>
+                <option value="work">알바/일</option>
+                <option value="event">이벤트</option>
+              </select>
 
-            {/* 색상 선택 */}
-            <div className="bg-white p-3 rounded border border-gray-300">
-              <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2">
-                색상 선택
-              </label>
-              <div className="space-y-2">
-                {/* 프리셋 색상 */}
-                <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="time"
+                  value={formData.startTime}
+                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                  className="px-3 py-2 border border-gray-300 rounded text-sm"
+                />
+                <input
+                  type="time"
+                  value={formData.endTime}
+                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                  className="px-3 py-2 border border-gray-300 rounded text-sm"
+                />
+              </div>
+
+              <input
+                type="text"
+                placeholder="장소"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+              />
+
+              {/* 색상 선택 */}
+              <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                <label className="block text-xs font-semibold text-gray-700 mb-2">
+                  색상
+                </label>
+                <div className="grid grid-cols-5 gap-2">
                   {SCHEDULE_COLOR_PRESETS.map(color => (
                     <button
                       key={color}
@@ -286,19 +267,17 @@ export default function ScheduleCalendar() {
                         setSelectedColor(color);
                         setUseCustomColor(false);
                       }}
-                      className={`w-8 h-8 md:w-10 md:h-10 rounded border-2 transition-all ${
+                      className={`w-8 h-8 rounded border-2 transition-all ${
                         !useCustomColor && selectedColor === color
                           ? 'border-gray-800 ring-2 ring-offset-1'
-                          : 'border-gray-300 hover:border-gray-500'
+                          : 'border-gray-300'
                       }`}
                       style={{ backgroundColor: color }}
-                      title={color}
                     />
                   ))}
                 </div>
 
-                {/* 커스텀 색상 */}
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-2 items-center mt-2">
                   <input
                     type="color"
                     value={customColor}
@@ -316,270 +295,116 @@ export default function ScheduleCalendar() {
                       setUseCustomColor(true);
                     }}
                     placeholder="#3b82f6"
-                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs md:text-sm font-mono"
+                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-mono"
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="time"
-                value={formData.startTime}
-                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded text-sm"
-              />
-              <input
-                type="time"
-                value={formData.endTime}
-                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded text-sm"
-              />
-            </div>
-
-            <input
-              type="text"
-              placeholder="장소 (선택)"
-              value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded text-sm md:text-base"
-            />
-
-            {/* 단일 모드: 날짜 선택 */}
-            {formMode === 'single' && (
-              <select
-                value={selectedDateForAdd || viewDate}
-                onChange={(e) => setSelectedDateForAdd(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded text-sm md:text-base"
-              >
-                {weekDates.map(date => {
-                  const d = new Date(date);
-                  return (
-                    <option key={date} value={date}>
-                      {DAY_NAMES[d.getDay()]} {d.getMonth() + 1}월 {d.getDate()}일
-                    </option>
-                  );
-                })}
-              </select>
-            )}
-
-            {/* 반복 모드: 기간 및 요일 선택 */}
-            {formMode === 'repeat' && (
-              <>
-                <div className="bg-white p-3 rounded border border-gray-300">
-                  <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2">
-                    시작일
-                  </label>
-                  <input
-                    type="date"
-                    value={repeatData.startDate}
-                    onChange={(e) =>
-                      setRepeatData({ ...repeatData, startDate: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                  />
-                </div>
-
-                <div className="bg-white p-3 rounded border border-gray-300">
-                  <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2">
-                    종료일
-                  </label>
-                  <input
-                    type="date"
-                    value={repeatData.endDate}
-                    onChange={(e) =>
-                      setRepeatData({ ...repeatData, endDate: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                  />
-                </div>
-
-                <div className="bg-white p-3 rounded border border-gray-300">
-                  <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2">
-                    반복할 요일
-                  </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[
-                      { day: 0, label: '일' },
-                      { day: 1, label: '월' },
-                      { day: 2, label: '화' },
-                      { day: 3, label: '수' },
-                      { day: 4, label: '목' },
-                      { day: 5, label: '금' },
-                      { day: 6, label: '토' },
-                    ].map(({ day, label }) => (
-                      <button
-                        key={day}
-                        onClick={() => {
-                          setRepeatData(prev => ({
-                            ...prev,
-                            daysOfWeek: prev.daysOfWeek.includes(day)
-                              ? prev.daysOfWeek.filter(d => d !== day)
-                              : [...prev.daysOfWeek, day],
-                          }));
-                        }}
-                        className={`py-2 rounded text-sm font-semibold transition-all ${
-                          repeatData.daysOfWeek.includes(day)
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* 버튼 */}
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={
-                  formMode === 'single' ? handleAddSchedule : generateRepeatSchedules
-                }
-                className="flex-1 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 font-semibold text-sm md:text-base"
-              >
-                {formMode === 'single' ? '저장' : '반복 생성'}
-              </button>
-              <button
-                onClick={resetForm}
-                className="flex-1 px-3 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 font-semibold text-sm md:text-base"
-              >
-                취소
-              </button>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={handleAddSchedule}
+                  className="flex-1 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 font-semibold text-sm"
+                >
+                  저장
+                </button>
+                <button
+                  onClick={resetForm}
+                  className="flex-1 px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-semibold text-sm"
+                >
+                  취소
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ---- 주간 시간표 ---- */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <div className="min-w-full inline-block">
-          {/* 주간 헤더 */}
-          <div className="flex border-b border-gray-200">
-            <div className="w-12 md:w-16 flex-shrink-0 bg-gray-50 border-r border-gray-200"></div>
-            {weekDates.map((date, idx) => {
-              const d = new Date(date);
-              const isToday = date === today();
-              return (
-                <div
-                  key={date}
-                  className={cn(
-                    'flex-1 min-w-24 md:min-w-32 text-center py-2 md:py-3 border-r border-gray-200 font-semibold text-xs md:text-base',
-                    isToday ? 'bg-blue-100 text-blue-900' : 'bg-gray-50 text-gray-700'
-                  )}
-                >
-                  <div className="text-xs md:text-sm">{DAY_NAMES[d.getDay()]}</div>
-                  <div className="text-sm md:text-lg">{d.getDate()}</div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* 시간대별 행 */}
-          {HOURS.map(hour => (
-            <div key={hour} className="flex border-t border-gray-200" style={{ height: '50px' }}>
-              <div className="w-12 md:w-16 flex-shrink-0 text-xs font-semibold text-gray-500 p-1 md:p-2 bg-gray-50 border-r border-gray-200 flex items-center justify-center">
+      {/* ---- 시간표 ---- */}
+      <div className="flex-1 overflow-auto relative">
+        <div className="flex">
+          {/* 시간 레이블 */}
+          <div className="w-10 flex-shrink-0 bg-white border-r border-gray-200">
+            {HOURS.map(hour => (
+              <div
+                key={hour}
+                className="h-10 border-b border-gray-200 flex items-center justify-center text-xs font-semibold text-gray-500"
+              >
                 {String(hour).padStart(2, '0')}
               </div>
+            ))}
+          </div>
 
-              {/* 각 요일 */}
-              {weekDates.map(date => (
-                <div
-                  key={date}
-                  className="flex-1 min-w-24 md:min-w-32 relative border-r border-gray-200"
-                  onClick={() => {
-                    setSelectedDateForAdd(date);
-                    setShowAddForm(true);
-                    setFormMode('single');
-                  }}
-                >
-                  {/* 이 시간대의 일정들 */}
-                  {weekSchedules
-                    .filter(
-                      s =>
-                        s.date === date &&
-                        s.startTime.startsWith(String(hour).padStart(2, '0'))
-                    )
-                    .map(schedule => (
+          {/* 요일별 시간표 */}
+          <div className="flex flex-1">
+            {weekDates.map((date, dateIdx) => (
+              <div
+                key={date}
+                className="flex-1 border-r border-gray-200 relative"
+              >
+                {/* 시간 그리드 */}
+                {HOURS.map(hour => (
+                  <div
+                    key={hour}
+                    className="h-10 border-b border-gray-100 relative cursor-pointer hover:bg-blue-50 transition-colors"
+                    onClick={() => {
+                      setCurrentDate(date);
+                      setFormData({ ...formData, startTime: `${String(hour).padStart(2, '0')}:00` });
+                      setShowAddForm(true);
+                    }}
+                  >
+                    {/* 현재 시간 표시 (빨간 선) */}
+                    {date === today() && (
                       <div
-                        key={schedule.id}
-                        className="absolute left-0.5 right-0.5 md:left-1 md:right-1 rounded p-0.5 md:p-1 text-white text-xs font-semibold cursor-pointer hover:opacity-80 group overflow-hidden"
-                        style={{
-                          backgroundColor: schedule.color || '#6b7280',
-                          top: `${getSchedulePosition(schedule.startTime) % 60}px`,
-                          height: `${getScheduleHeight(schedule.startTime, schedule.endTime)}px`,
-                        }}
-                        onClick={(e) => e.stopPropagation()}
+                        className="absolute left-0 right-0 border-t-2 border-red-500 z-20"
+                        style={{ top: `${getCurrentTimePosition() % HOUR_HEIGHT}px` }}
                       >
-                        <div className="truncate text-xs">{schedule.title}</div>
-                        <div className="text-xs opacity-90 hidden md:block">
-                          {schedule.startTime}
+                        <div className="absolute -left-10 -top-2 bg-red-500 text-white text-xs font-bold px-1 rounded whitespace-nowrap">
+                          {getCurrentTimeString()}
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteSchedule(schedule.id);
-                          }}
-                          className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
                       </div>
-                    ))}
-                </div>
-              ))}
-            </div>
-          ))}
+                    )}
+                  </div>
+                ))}
+
+                {/* 일정 렌더링 */}
+                {weekSchedules
+                  .filter(s => s.date === date)
+                  .map(schedule => (
+                    <div
+                      key={schedule.id}
+                      className="absolute left-0.5 right-0.5 rounded p-0.5 text-white text-xs font-semibold group hover:shadow-lg transition-shadow overflow-hidden"
+                      style={{
+                        backgroundColor: schedule.color || '#6b7280',
+                        top: `${getSchedulePosition(schedule.startTime)}px`,
+                        height: `${getScheduleHeight(schedule.startTime, schedule.endTime)}px`,
+                      }}
+                    >
+                      <div className="truncate text-xs leading-tight">{schedule.title}</div>
+                      <div className="text-xs opacity-90 leading-tight">{schedule.startTime}</div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSchedule(schedule.id);
+                        }}
+                        className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* ---- 주간 일정 요약 ---- */}
-      {weekSchedules.length > 0 && (
-        <div className="mt-4 md:mt-6 bg-blue-50 p-3 md:p-4 rounded-lg border border-blue-200">
-          <h3 className="font-semibold text-blue-900 mb-3 text-sm md:text-base">주간 일정 요약</h3>
-          <div className="space-y-2 md:space-y-3 max-h-64 md:max-h-none overflow-y-auto md:overflow-y-visible">
-            {weekDates.map(date => {
-              const daySchedules = weekSchedules.filter(s => s.date === date);
-              if (daySchedules.length === 0) return null;
-
-              const d = new Date(date);
-              return (
-                <div key={date} className="bg-white p-2 md:p-3 rounded border-l-4 border-blue-400">
-                  <div className="font-semibold text-gray-800 mb-1 md:mb-2 text-xs md:text-sm">
-                    {DAY_NAMES[d.getDay()]} {d.getMonth() + 1}월 {d.getDate()}일
-                  </div>
-                  <div className="space-y-1">
-                    {daySchedules.map(schedule => (
-                      <div
-                        key={schedule.id}
-                        className="text-xs md:text-sm text-gray-700 flex justify-between items-center gap-2"
-                      >
-                        <span className="flex-1 min-w-0">
-                          <span
-                            className="inline-block w-2 h-2 rounded-full mr-1"
-                            style={{ backgroundColor: schedule.color || '#6b7280' }}
-                          ></span>
-                          <span className="truncate">
-                            {schedule.startTime}-{schedule.endTime} {schedule.title}
-                          </span>
-                        </span>
-                        <button
-                          onClick={() => deleteSchedule(schedule.id)}
-                          className="text-red-500 hover:text-red-700 flex-shrink-0"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* ---- 플로팅 추가 버튼 ---- */}
+      <button
+        onClick={() => setShowAddForm(true)}
+        className="fixed bottom-6 right-6 w-12 h-12 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 flex items-center justify-center z-40 transition-all hover:scale-110"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
     </div>
   );
 }
