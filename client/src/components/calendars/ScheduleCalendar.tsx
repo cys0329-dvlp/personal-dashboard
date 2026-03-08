@@ -1,30 +1,26 @@
 // ============================================================
-// Schedule Calendar - 주간 시간표 (반복 일정 기능 포함)
+// Schedule Calendar - 주간 시간표 (카테고리 색상 기능 포함)
 // 강의, 알바 등 시간 정보를 시간표 형식으로 표시
 // 모바일 최적화 완료
 // ============================================================
 
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Trash2, Repeat2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Repeat2, Palette } from 'lucide-react';
 import { useDashboard } from '@/contexts/DashboardContext';
 import { DAY_NAMES, MONTH_NAMES, today } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const SCHEDULE_COLORS = {
-  lecture: '#3b82f6',
-  work: '#ef4444',
-  event: '#8b5cf6',
-};
 
 type FormMode = 'single' | 'repeat';
 
 export default function ScheduleCalendar() {
-  const { schedules, addSchedule, deleteSchedule } = useDashboard();
+  const { schedules, addSchedule, deleteSchedule, scheduleCategories } = useDashboard();
   const [viewDate, setViewDate] = useState(today());
   const [showAddForm, setShowAddForm] = useState(false);
   const [formMode, setFormMode] = useState<FormMode>('single');
   const [selectedDateForAdd, setSelectedDateForAdd] = useState<string | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [formData, setFormData] = useState({
     title: '',
     type: 'lecture' as const,
@@ -38,6 +34,20 @@ export default function ScheduleCalendar() {
     endDate: today(),
     daysOfWeek: [1, 2, 3, 4, 5], // Mon-Fri by default
   });
+
+  // Get category color
+  const getCategoryColor = (categoryId?: string) => {
+    if (categoryId && scheduleCategories[categoryId]) {
+      return scheduleCategories[categoryId].color;
+    }
+    // Fallback to type-based color
+    const typeColors: Record<string, string> = {
+      lecture: '#3b82f6',
+      work: '#ef4444',
+      event: '#8b5cf6',
+    };
+    return typeColors[formData.type] || '#6b7280';
+  };
 
   // ---- 날짜 계산 함수 ----
   const getWeekDates = (dateStr: string): string[] => {
@@ -89,6 +99,7 @@ export default function ScheduleCalendar() {
 
     const start = new Date(repeatData.startDate);
     const end = new Date(repeatData.endDate);
+    const categoryColor = getCategoryColor(selectedCategoryId);
 
     const schedulesToAdd = [];
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -103,7 +114,8 @@ export default function ScheduleCalendar() {
           endTime: formData.endTime,
           location: formData.location,
           description: formData.description,
-          color: SCHEDULE_COLORS[formData.type],
+          color: categoryColor,
+          category: selectedCategoryId,
         });
       }
     }
@@ -120,10 +132,13 @@ export default function ScheduleCalendar() {
       return;
     }
 
+    const categoryColor = getCategoryColor(selectedCategoryId);
+
     addSchedule({
       ...formData,
       date: selectedDateForAdd || viewDate,
-      color: SCHEDULE_COLORS[formData.type],
+      color: categoryColor,
+      category: selectedCategoryId,
     });
 
     resetForm();
@@ -143,6 +158,7 @@ export default function ScheduleCalendar() {
       endDate: today(),
       daysOfWeek: [1, 2, 3, 4, 5],
     });
+    setSelectedCategoryId('');
     setShowAddForm(false);
     setSelectedDateForAdd(null);
     setFormMode('single');
@@ -167,6 +183,13 @@ export default function ScheduleCalendar() {
     const endDate = new Date(weekDates[6]);
     return `${startDate.getMonth() + 1}월 ${startDate.getDate()}일 - ${endDate.getMonth() + 1}월 ${endDate.getDate()}일`;
   };
+
+  // Get category list for current type
+  const categoriesForType = useMemo(() => {
+    return Object.values(scheduleCategories).filter(
+      cat => !cat.type || cat.type === formData.type
+    );
+  }, [scheduleCategories, formData.type]);
 
   return (
     <div className="w-full">
@@ -253,13 +276,48 @@ export default function ScheduleCalendar() {
 
             <select
               value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+              onChange={(e) => {
+                setFormData({ ...formData, type: e.target.value as any });
+                setSelectedCategoryId(''); // Reset category when type changes
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded text-sm md:text-base"
             >
               <option value="lecture">강의</option>
               <option value="work">알바/일</option>
               <option value="event">이벤트</option>
             </select>
+
+            {/* 카테고리 색상 선택 */}
+            {categoriesForType.length > 0 && (
+              <div className="bg-white p-3 rounded border border-gray-300">
+                <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <Palette className="w-4 h-4" />
+                  카테고리 색상
+                </label>
+                <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+                  {categoriesForType.map(category => (
+                    <button
+                      key={category.id}
+                      onClick={() => setSelectedCategoryId(category.id)}
+                      className={`p-3 rounded border-2 transition-all ${
+                        selectedCategoryId === category.id
+                          ? 'border-gray-800 ring-2 ring-offset-1'
+                          : 'border-gray-300 hover:border-gray-500'
+                      }`}
+                      style={{
+                        backgroundColor: category.color,
+                        opacity: selectedCategoryId === category.id ? 1 : 0.7,
+                      }}
+                      title={category.name}
+                    >
+                      <span className="text-xs font-semibold text-white drop-shadow">
+                        {category.name.substring(0, 2)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2">
               <input
@@ -446,7 +504,7 @@ export default function ScheduleCalendar() {
                         key={schedule.id}
                         className="absolute left-0.5 right-0.5 md:left-1 md:right-1 rounded p-0.5 md:p-1 text-white text-xs font-semibold cursor-pointer hover:opacity-80 group overflow-hidden"
                         style={{
-                          backgroundColor: schedule.color,
+                          backgroundColor: schedule.color || '#6b7280',
                           top: `${getSchedulePosition(schedule.startTime) % 60}px`,
                           height: `${getScheduleHeight(schedule.startTime, schedule.endTime)}px`,
                         }}
@@ -498,7 +556,7 @@ export default function ScheduleCalendar() {
                         <span className="flex-1 min-w-0">
                           <span
                             className="inline-block w-2 h-2 rounded-full mr-1"
-                            style={{ backgroundColor: schedule.color }}
+                            style={{ backgroundColor: schedule.color || '#6b7280' }}
                           ></span>
                           <span className="truncate">
                             {schedule.startTime}-{schedule.endTime} {schedule.title}

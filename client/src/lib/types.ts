@@ -94,7 +94,29 @@ export interface Schedule {
   location?: string;
   description?: string;
   color?: string;
+  category?: string; // 커스텀 카테고리
   createdAt: string;
+}
+
+// ---- Schedule Category Colors ----
+export const DEFAULT_SCHEDULE_COLORS: Record<ScheduleType, string> = {
+  'lecture': '#3b82f6',  // Blue
+  'work': '#ef4444',     // Red
+  'event': '#8b5cf6',    // Purple
+};
+
+export interface ScheduleCategory {
+  id: string;
+  name: string;
+  color: string;
+  type?: 'lecture' | 'work' | 'event';
+}
+
+export type ScheduleCategoryMap = Record<string, ScheduleCategory>;
+
+// ---- Schedule Category Management ----
+export interface ScheduleCategorySettings {
+  categories: ScheduleCategoryMap;
 }
 
 // ---- Income Allocation (월별 수입 배분) ----
