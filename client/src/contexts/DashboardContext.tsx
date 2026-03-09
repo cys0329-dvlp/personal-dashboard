@@ -40,6 +40,7 @@ interface DashboardContextType {
   addSchedule: (s: Omit<Schedule, 'id' | 'createdAt'>) => void;
   updateSchedule: (id: string, s: Partial<Schedule>) => void;
   deleteSchedule: (id: string) => void;
+  addRepeatSchedule: (s: Omit<Schedule, 'id' | 'createdAt'>) => void; // 반복 일정 추가
 
   // Income Allocation (월별 수입 배분)
   incomeAllocations: IncomeAllocation[];
@@ -161,6 +162,62 @@ export function DashboardProvider({
     setSchedules(prev => prev.filter(item => item.id !== id));
   }, []);
 
+  // 반복 일정 추가 함수
+  const addRepeatSchedule = useCallback((s: Omit<Schedule, 'id' | 'createdAt'>) => {
+    const scheduleList: Schedule[] = [];
+    const repeatType = s.repeatType || 'none';
+    const repeatEndDate = s.repeatEndDate ? new Date(s.repeatEndDate) : new Date();
+    const repeatDays = s.repeatDays || [0, 1, 2, 3, 4, 5, 6];
+    
+    if (repeatType === 'none') {
+      // 반복 없음 - 단일 일정 추가
+      const newS: Schedule = { ...s, id: generateId(), createdAt: new Date().toISOString() };
+      scheduleList.push(newS);
+    } else if (repeatType === 'weekly') {
+      // 매주 반복
+      const startDate = new Date(s.date);
+      let currentDate = new Date(startDate);
+      const parentId = generateId();
+      
+      while (currentDate <= repeatEndDate) {
+        const dayOfWeek = currentDate.getDay();
+        if (repeatDays.includes(dayOfWeek)) {
+          const dateStr = currentDate.toISOString().split('T')[0];
+          const newS: Schedule = {
+            ...s,
+            id: generateId(),
+            date: dateStr,
+            parentId,
+            createdAt: new Date().toISOString(),
+          };
+          scheduleList.push(newS);
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    } else if (repeatType === 'monthly') {
+      // 매월 반복
+      const startDate = new Date(s.date);
+      const dayOfMonth = startDate.getDate();
+      let currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), dayOfMonth);
+      const parentId = generateId();
+      
+      while (currentDate <= repeatEndDate) {
+        const dateStr = currentDate.toISOString().split('T')[0];
+        const newS: Schedule = {
+          ...s,
+          id: generateId(),
+          date: dateStr,
+          parentId,
+          createdAt: new Date().toISOString(),
+        };
+        scheduleList.push(newS);
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      }
+    }
+    
+    setSchedules(prev => [...prev, ...scheduleList]);
+  }, []);
+
   // ---- Income Allocation ----
   const setIncomeAllocationFn = useCallback((month: string, allocation: Omit<IncomeAllocation, 'id' | 'createdAt' | 'updatedAt'>) => {
     setIncomeAllocations(prev => {
@@ -188,7 +245,7 @@ export function DashboardProvider({
       projects, addProject, updateProject, completeProject,
       deletedProjects, restoreProject,
       tasks, addTask, updateTask, deleteTask, toggleTask,
-      schedules, addSchedule, updateSchedule, deleteSchedule,
+      schedules, addSchedule, updateSchedule, deleteSchedule, addRepeatSchedule,
       incomeAllocations, setIncomeAllocation: setIncomeAllocationFn, getIncomeAllocation,
     }}>
       {children}

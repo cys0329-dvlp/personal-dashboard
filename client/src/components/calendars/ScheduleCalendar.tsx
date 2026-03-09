@@ -4,7 +4,7 @@
 // ============================================================
 
 import { useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Repeat2 } from 'lucide-react';
 import { useDashboard } from '@/contexts/DashboardContext';
 import { DAY_NAMES, today } from '@/lib/utils';
 import { cn } from '@/lib/utils';
@@ -12,9 +12,10 @@ import { SCHEDULE_COLOR_PRESETS } from '@/lib/types';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const HOUR_HEIGHT = 40; // 작은 칸 크기 (px)
+const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
 export default function ScheduleCalendar() {
-  const { schedules, addSchedule, deleteSchedule } = useDashboard();
+  const { schedules, addSchedule, addRepeatSchedule, deleteSchedule } = useDashboard();
   
   // 상태
   const [weekStartDate, setWeekStartDate] = useState(today());
@@ -23,6 +24,11 @@ export default function ScheduleCalendar() {
   const [useCustomColor, setUseCustomColor] = useState(false);
   const [customColor, setCustomColor] = useState<string>('#3b82f6');
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // 반복 옵션 상태
+  const [repeatType, setRepeatType] = useState<'none' | 'weekly' | 'monthly'>('none');
+  const [repeatEndDate, setRepeatEndDate] = useState<string>('');
+  const [repeatDays, setRepeatDays] = useState<number[]>([1, 2, 3, 4, 5]); // 기본값: 월-금
 
   const [formData, setFormData] = useState({
     title: '',
@@ -85,6 +91,15 @@ export default function ScheduleCalendar() {
     return useCustomColor ? customColor : selectedColor;
   };
 
+  // 요일 토글
+  const toggleRepeatDay = (dayNum: number) => {
+    setRepeatDays(prev =>
+      prev.includes(dayNum)
+        ? prev.filter(d => d !== dayNum)
+        : [...prev, dayNum].sort()
+    );
+  };
+
   // 일정 추가
   const handleAddSchedule = () => {
     if (!formData.title || !formData.startTime || !formData.endTime) {
@@ -92,13 +107,27 @@ export default function ScheduleCalendar() {
       return;
     }
 
+    if (repeatType !== 'none' && !repeatEndDate) {
+      alert('반복 종료일을 입력해주세요');
+      return;
+    }
+
     const finalColor = getFinalColor();
 
-    addSchedule({
+    const scheduleData = {
       ...formData,
       date: weekStartDate,
       color: finalColor,
-    });
+      repeatType,
+      repeatEndDate: repeatType !== 'none' ? repeatEndDate : undefined,
+      repeatDays: repeatType !== 'none' ? repeatDays : undefined,
+    };
+
+    if (repeatType === 'none') {
+      addSchedule(scheduleData);
+    } else {
+      addRepeatSchedule(scheduleData);
+    }
 
     resetForm();
   };
@@ -115,6 +144,9 @@ export default function ScheduleCalendar() {
     setSelectedColor(SCHEDULE_COLOR_PRESETS[0]);
     setUseCustomColor(false);
     setCustomColor('#3b82f6');
+    setRepeatType('none');
+    setRepeatEndDate('');
+    setRepeatDays([1, 2, 3, 4, 5]);
     setShowAddForm(false);
   };
 
@@ -223,7 +255,7 @@ export default function ScheduleCalendar() {
       {/* ---- 일정 추가 폼 (모달) ---- */}
       {showAddForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center z-50">
-          <div className="bg-white w-full md:w-96 rounded-t-2xl md:rounded-2xl p-4 max-h-96 overflow-y-auto">
+          <div className="bg-white w-full md:w-96 rounded-t-2xl md:rounded-2xl p-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-gray-900 mb-4">일정 추가</h3>
 
             <div className="space-y-3">
@@ -314,6 +346,56 @@ export default function ScheduleCalendar() {
                 </div>
               </div>
 
+              {/* 반복 옵션 */}
+              <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                  <Repeat2 className="w-4 h-4" />
+                  반복 설정
+                </label>
+
+                <select
+                  value={repeatType}
+                  onChange={(e) => setRepeatType(e.target.value as any)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm mb-2"
+                >
+                  <option value="none">반복 없음</option>
+                  <option value="weekly">매주 반복</option>
+                  <option value="monthly">매월 반복</option>
+                </select>
+
+                {repeatType !== 'none' && (
+                  <>
+                    {/* 반복 종료일 */}
+                    <input
+                      type="date"
+                      value={repeatEndDate}
+                      onChange={(e) => setRepeatEndDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm mb-2"
+                      placeholder="반복 종료일"
+                    />
+
+                    {/* 요일 선택 (매주 반복일 때만) */}
+                    {repeatType === 'weekly' && (
+                      <div className="grid grid-cols-7 gap-1">
+                        {DAY_LABELS.map((label, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => toggleRepeatDay(idx)}
+                            className={`py-1 text-xs font-semibold rounded transition-colors ${
+                              repeatDays.includes(idx)
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={handleAddSchedule}
@@ -379,9 +461,13 @@ export default function ScheduleCalendar() {
                         top: `${getSchedulePosition(schedule.startTime)}px`,
                         height: `${getScheduleHeight(schedule.startTime, schedule.endTime)}px`,
                       }}
+                      title={`${schedule.title} (${schedule.startTime}-${schedule.endTime})`}
                     >
                       <div className="truncate text-xs leading-tight">{schedule.title}</div>
                       <div className="text-xs opacity-90 leading-tight">{schedule.startTime}</div>
+                      {schedule.parentId && (
+                        <Repeat2 className="w-2 h-2 inline-block ml-0.5" />
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

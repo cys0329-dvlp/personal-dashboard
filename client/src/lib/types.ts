@@ -94,6 +94,10 @@ export interface Schedule {
   location?: string;
   description?: string;
   color?: string; // 사용자가 직접 지정한 색상
+  repeatType?: 'none' | 'weekly' | 'monthly'; // 반복 타입
+  repeatEndDate?: string; // YYYY-MM-DD (반복 종료일)
+  repeatDays?: number[]; // 0-6 (일-토)
+  parentId?: string; // 원본 반복 일정 ID
   createdAt: string;
 }
 
