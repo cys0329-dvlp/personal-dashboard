@@ -62,7 +62,7 @@ export default function Layout({ activeTab, onTabChange, children, username, onL
             MY
           </div>
           <div>
-            <div className="text-white font-bold text-base leading-tight">My Dashboard</div>
+            <div className="text-white font-bold text-base leading-tight">Life OS</div>
             <div className="text-white/40 text-xs">개인 생산성 플래너</div>
           </div>
           <button

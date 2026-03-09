@@ -17,9 +17,8 @@ export default function ScheduleCalendar() {
   const { schedules, addSchedule, deleteSchedule } = useDashboard();
   
   // 상태
-  const [currentDate, setCurrentDate] = useState(today());
+  const [weekStartDate, setWeekStartDate] = useState(today());
   const [showAddForm, setShowAddForm] = useState(false);
-  const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const [selectedColor, setSelectedColor] = useState<string>(SCHEDULE_COLOR_PRESETS[0]);
   const [useCustomColor, setUseCustomColor] = useState(false);
   const [customColor, setCustomColor] = useState<string>('#3b82f6');
@@ -40,23 +39,19 @@ export default function ScheduleCalendar() {
     return () => clearInterval(timer);
   }, []);
 
-  // 주간 날짜 계산
+  // 주간 날짜 계산 (weekStartDate부터 7일)
   const getWeekDates = (dateStr: string): string[] => {
     const date = new Date(dateStr);
-    const day = date.getDay();
-    const diff = date.getDate() - day;
-    const weekStart = new Date(date.setDate(diff));
-
     const dates: string[] = [];
     for (let i = 0; i < 7; i++) {
-      const d = new Date(weekStart);
+      const d = new Date(date);
       d.setDate(d.getDate() + i);
       dates.push(d.toISOString().split('T')[0]);
     }
     return dates;
   };
 
-  const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate]);
+  const weekDates = useMemo(() => getWeekDates(weekStartDate), [weekStartDate]);
 
   // 주간 일정 필터링
   const weekSchedules = useMemo(() => {
@@ -68,11 +63,21 @@ export default function ScheduleCalendar() {
       });
   }, [schedules, weekDates]);
 
-  // 월 변경
-  const changeMonth = (offset: number) => {
-    const d = new Date(currentDate);
-    d.setMonth(d.getMonth() + offset);
-    setCurrentDate(d.toISOString().split('T')[0]);
+  // 주 변경
+  const changeWeek = (offset: number) => {
+    const d = new Date(weekStartDate);
+    d.setDate(d.getDate() + offset * 7);
+    setWeekStartDate(d.toISOString().split('T')[0]);
+  };
+
+  // 오늘로 이동
+  const goToToday = () => {
+    const todayDate = today();
+    const d = new Date(todayDate);
+    const day = d.getDay();
+    const diff = d.getDate() - day;
+    const weekStart = new Date(d.setDate(diff));
+    setWeekStartDate(weekStart.toISOString().split('T')[0]);
   };
 
   // 색상 선택
@@ -91,7 +96,7 @@ export default function ScheduleCalendar() {
 
     addSchedule({
       ...formData,
-      date: currentDate,
+      date: weekStartDate,
       color: finalColor,
     });
 
@@ -111,7 +116,6 @@ export default function ScheduleCalendar() {
     setUseCustomColor(false);
     setCustomColor('#3b82f6');
     setShowAddForm(false);
-    setSelectedHour(null);
   };
 
   // 위치/높이 계산
@@ -127,7 +131,7 @@ export default function ScheduleCalendar() {
     return Math.max(duration * HOUR_HEIGHT, 20);
   };
 
-  // 현재 시간 위치
+  // 현재 시간 위치 (절대값)
   const getCurrentTimePosition = () => {
     const hours = currentTime.getHours();
     const mins = currentTime.getMinutes();
@@ -139,10 +143,20 @@ export default function ScheduleCalendar() {
     return `${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')}`;
   };
 
-  // 월 표시
-  const getMonthDisplay = () => {
-    const d = new Date(currentDate);
-    return `${d.getMonth() + 1}월`;
+  // 주 표시 (예: 3월 8-14주)
+  const getWeekDisplay = () => {
+    const startD = new Date(weekDates[0]);
+    const endD = new Date(weekDates[6]);
+    const startMonth = startD.getMonth() + 1;
+    const endMonth = endD.getMonth() + 1;
+    const startDate = startD.getDate();
+    const endDate = endD.getDate();
+    
+    if (startMonth === endMonth) {
+      return `${startMonth}월 ${startDate}-${endDate}주`;
+    } else {
+      return `${startMonth}월 ${startDate}-${endMonth}월 ${endDate}주`;
+    }
   };
 
   return (
@@ -151,18 +165,18 @@ export default function ScheduleCalendar() {
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 bg-white sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => changeMonth(-1)}
+            onClick={() => changeWeek(-1)}
             className="p-1 hover:bg-gray-100 rounded"
           >
             <ChevronLeft className="w-5 h-5 text-gray-700" />
           </button>
 
-          <span className="text-sm font-semibold text-gray-800 min-w-12">
-            {getMonthDisplay()}
+          <span className="text-sm font-semibold text-gray-800 min-w-24">
+            {getWeekDisplay()}
           </span>
 
           <button
-            onClick={() => changeMonth(1)}
+            onClick={() => changeWeek(1)}
             className="p-1 hover:bg-gray-100 rounded"
           >
             <ChevronRight className="w-5 h-5 text-gray-700" />
@@ -170,7 +184,7 @@ export default function ScheduleCalendar() {
         </div>
 
         <button
-          onClick={() => setCurrentDate(today())}
+          onClick={goToToday}
           className="px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded"
         >
           오늘
@@ -335,7 +349,7 @@ export default function ScheduleCalendar() {
           </div>
 
           {/* 요일별 시간표 */}
-          <div className="flex flex-1">
+          <div className="flex flex-1 relative">
             {weekDates.map((date, dateIdx) => (
               <div
                 key={date}
@@ -347,23 +361,10 @@ export default function ScheduleCalendar() {
                     key={hour}
                     className="h-10 border-b border-gray-100 relative cursor-pointer hover:bg-blue-50 transition-colors"
                     onClick={() => {
-                      setCurrentDate(date);
                       setFormData({ ...formData, startTime: `${String(hour).padStart(2, '0')}:00` });
                       setShowAddForm(true);
                     }}
-                  >
-                    {/* 현재 시간 표시 (빨간 선) */}
-                    {date === today() && (
-                      <div
-                        className="absolute left-0 right-0 border-t-2 border-red-500 z-20"
-                        style={{ top: `${getCurrentTimePosition() % HOUR_HEIGHT}px` }}
-                      >
-                        <div className="absolute -left-10 -top-2 bg-red-500 text-white text-xs font-bold px-1 rounded whitespace-nowrap">
-                          {getCurrentTimeString()}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  />
                 ))}
 
                 {/* 일정 렌더링 */}
@@ -394,6 +395,18 @@ export default function ScheduleCalendar() {
                   ))}
               </div>
             ))}
+
+            {/* 현재 시간 표시 (빨간 선) - 오늘 날짜에만 */}
+            {weekDates.includes(today()) && (
+              <div
+                className="absolute left-0 right-0 border-t-2 border-red-500 z-20 pointer-events-none"
+                style={{ top: `${getCurrentTimePosition()}px` }}
+              >
+                <div className="absolute -left-10 -top-2 bg-red-500 text-white text-xs font-bold px-1 rounded whitespace-nowrap">
+                  {getCurrentTimeString()}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
