@@ -1,6 +1,6 @@
-// ============================================================
 // Todo Calendar - 할 일 캘린더
 // 프로젝트 할 일 + 임의 추가 할 일 표시
+// 기간 기반 할 일은 가로 바로 표시
 // ============================================================
 
 import { useState, useMemo } from 'react';
@@ -25,17 +25,59 @@ export default function TodoCalendar() {
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
 
-  // 날짜별 할 일
-  const tasksByDate = useMemo(() => {
-    const map: Record<string, typeof tasks> = {};
+  // 날짜 생성 헬퍼
+  const dateStr = (day: number) => {
+    return `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  };
+
+  // 두 날짜 사이의 일수 계산
+  const getDaysBetween = (startDate: string, endDate: string): number => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = end.getTime() - start.getTime();
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  };
+
+  // 할 일을 기간 기반과 단일 날짜 기반으로 분류
+  const { rangedTasks, singleDateTasks } = useMemo(() => {
+    const ranged: typeof tasks = [];
+    const single: Record<string, typeof tasks> = {};
+
     tasks.forEach(t => {
       if (t.dueDate) {
-        if (!map[t.dueDate]) map[t.dueDate] = [];
-        map[t.dueDate].push(t);
+        // detail에서 기간 정보 추출 (예: "2026-03-10부터 2026-03-12까지")
+        const match = t.detail?.match(/(\d{4}-\d{2}-\d{2})부터\s+(\d{4}-\d{2}-\d{2})까지/);
+        if (match) {
+          const startDate = match[1];
+          const endDate = match[2];
+          if (startDate !== endDate) {
+            ranged.push({ ...t, startDate, endDate } as any);
+          } else {
+            if (!single[t.dueDate]) single[t.dueDate] = [];
+            single[t.dueDate].push(t);
+          }
+        } else {
+          if (!single[t.dueDate]) single[t.dueDate] = [];
+          single[t.dueDate].push(t);
+        }
       }
     });
-    return map;
+
+    return { rangedTasks: ranged, singleDateTasks: single };
   }, [tasks]);
+
+  // 현재 월에 표시될 기간 할 일 필터링
+  const visibleRangedTasks = useMemo(() => {
+    const monthStart = dateStr(1);
+    const monthEnd = dateStr(daysInMonth);
+
+    return rangedTasks.filter(task => {
+      const taskStart = (task as any).startDate;
+      const taskEnd = (task as any).endDate;
+      // 현재 월과 겹치는 기간만 표시
+      return taskStart <= monthEnd && taskEnd >= monthStart;
+    });
+  }, [rangedTasks, viewYear, viewMonth, daysInMonth]);
 
   const prevMonth = () => {
     if (viewMonth === 0) {
@@ -53,10 +95,6 @@ export default function TodoCalendar() {
     } else {
       setViewMonth(m => m + 1);
     }
-  };
-
-  const dateStr = (day: number) => {
-    return `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   };
 
   const handleAddTask = () => {
@@ -87,16 +125,30 @@ export default function TodoCalendar() {
     setShowAddForm(false);
   };
 
+  // 기간 할 일의 시작 위치와 너비 계산
+  const getTaskPosition = (startDate: string) => {
+    const monthStart = dateStr(1);
+    const taskDate = new Date(startDate);
+    const monthStartDate = new Date(monthStart);
+    const diffDays = Math.floor((taskDate.getTime() - monthStartDate.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const getTaskWidth = (startDate: string, endDate: string) => {
+    return getDaysBetween(startDate, endDate);
+  };
+
+  // 캘린더 셀 생성
   const cells = [];
   // 이전 달 빈 칸
   for (let i = 0; i < firstDay; i++) {
-    cells.push(<div key={`empty-${i}`} className="bg-gray-50 p-2"></div>);
+    cells.push(<div key={`empty-${i}`} className="bg-gray-50 p-2 min-h-24"></div>);
   }
   // 현재 달 날짜
   for (let day = 1; day <= daysInMonth; day++) {
     const date = dateStr(day);
     const isToday = date === todayStr;
-    const dayTasks = tasksByDate[date] || [];
+    const dayTasks = singleDateTasks[date] || [];
     const completedCount = dayTasks.filter(t => t.completed).length;
 
     cells.push(
@@ -104,7 +156,7 @@ export default function TodoCalendar() {
         key={day}
         onClick={() => setSelectedDate(date)}
         className={cn(
-          'p-2 border rounded cursor-pointer transition-all min-h-24',
+          'p-2 border rounded cursor-pointer transition-all min-h-24 relative',
           isToday ? 'bg-green-100 border-green-400 font-semibold' : 'bg-white border-gray-200 hover:bg-gray-50',
           selectedDate === date ? 'ring-2 ring-emerald-500' : ''
         )}
@@ -150,6 +202,48 @@ export default function TodoCalendar() {
           <ChevronRight className="w-6 h-6 text-emerald-700" />
         </button>
       </div>
+
+      {/* 기간 할 일 바 표시 */}
+      {visibleRangedTasks.length > 0 && (
+        <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+          <h3 className="font-semibold text-blue-900 mb-3">기간 할 일</h3>
+          <div className="space-y-2">
+            {visibleRangedTasks.map((task, idx) => {
+              const startDate = (task as any).startDate;
+              const endDate = (task as any).endDate;
+              const startPos = getTaskPosition(startDate);
+              const width = getTaskWidth(startDate, endDate);
+              
+              return (
+                <div key={idx} className="relative h-8 bg-white rounded border border-blue-200">
+                  {/* 7열 그리드 배경 */}
+                  <div className="absolute inset-0 flex">
+                    {Array.from({ length: 7 }).map((_, i) => (
+                      <div key={i} className="flex-1 border-r border-gray-100 last:border-r-0"></div>
+                    ))}
+                  </div>
+                  
+                  {/* 기간 바 */}
+                  <div
+                    className={cn(
+                      'absolute top-0 bottom-0 rounded flex items-center px-2 text-white text-xs font-semibold truncate transition-all',
+                      task.completed ? 'bg-gray-400 opacity-60' : 'bg-blue-500 hover:bg-blue-600'
+                    )}
+                    style={{
+                      left: `${(startPos / 7) * 100}%`,
+                      width: `${(width / 7) * 100}%`,
+                      minWidth: '50px',
+                    }}
+                    title={`${task.title} (${startDate} ~ ${endDate})`}
+                  >
+                    {task.completed ? '✓' : '○'} {task.title}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Day names */}
       <div className="grid grid-cols-7 gap-1 mb-2">
@@ -231,11 +325,11 @@ export default function TodoCalendar() {
           )}
 
           {/* Task List */}
-          {tasksByDate[selectedDate]?.length === 0 ? (
+          {(singleDateTasks[selectedDate]?.length === 0) ? (
             <p className="text-gray-500 text-sm">이 날짜에 할 일이 없습니다.</p>
           ) : (
             <div className="space-y-2">
-              {tasksByDate[selectedDate]?.map(task => (
+              {singleDateTasks[selectedDate]?.map(task => (
                 <div
                   key={task.id}
                   className="flex items-center gap-2 p-2 bg-white rounded border-l-4 border-emerald-400"
