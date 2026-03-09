@@ -10,7 +10,7 @@ import { DAY_NAMES, today } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { SCHEDULE_COLOR_PRESETS } from '@/lib/types';
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const HOURS = Array.from({ length: 17 }, (_, i) => i + 8); // 08:00 ~ 24:00 (17시간)
 const HOUR_HEIGHT = 40; // 작은 칸 크기 (px)
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -45,12 +45,17 @@ export default function ScheduleCalendar() {
     return () => clearInterval(timer);
   }, []);
 
-  // 주간 날짜 계산 (weekStartDate부터 7일)
+  // 주간 날짜 계산 (월요일부터 일요일까지)
   const getWeekDates = (dateStr: string): string[] => {
     const date = new Date(dateStr);
+    const day = date.getDay();
+    // 월요일(1)을 기준으로 계산
+    const diff = date.getDate() - (day === 0 ? 6 : day - 1);
+    const weekStart = new Date(date.setDate(diff));
+    
     const dates: string[] = [];
     for (let i = 0; i < 7; i++) {
-      const d = new Date(date);
+      const d = new Date(weekStart);
       d.setDate(d.getDate() + i);
       dates.push(d.toISOString().split('T')[0]);
     }
@@ -76,12 +81,12 @@ export default function ScheduleCalendar() {
     setWeekStartDate(d.toISOString().split('T')[0]);
   };
 
-  // 오늘로 이동
+  // 오늘로 이동 (월요일 기준)
   const goToToday = () => {
     const todayDate = today();
     const d = new Date(todayDate);
     const day = d.getDay();
-    const diff = d.getDate() - day;
+    const diff = d.getDate() - (day === 0 ? 6 : day - 1);
     const weekStart = new Date(d.setDate(diff));
     setWeekStartDate(weekStart.toISOString().split('T')[0]);
   };
@@ -153,7 +158,7 @@ export default function ScheduleCalendar() {
   // 위치/높이 계산
   const getSchedulePosition = (startTime: string) => {
     const [hours, mins] = startTime.split(':').map(Number);
-    return (hours + mins / 60) * HOUR_HEIGHT;
+    return (hours - 8 + mins / 60) * HOUR_HEIGHT;
   };
 
   const getScheduleHeight = (startTime: string, endTime: string) => {
@@ -163,11 +168,17 @@ export default function ScheduleCalendar() {
     return Math.max(duration * HOUR_HEIGHT, 20);
   };
 
-  // 현재 시간 위치 (절대값)
+  // 현재 시간 위치 (절대값, 08:00 기준)
   const getCurrentTimePosition = () => {
     const hours = currentTime.getHours();
     const mins = currentTime.getMinutes();
-    return (hours + mins / 60) * HOUR_HEIGHT;
+    return (hours - 8 + mins / 60) * HOUR_HEIGHT;
+  };
+
+  // 마른 시간이 08:00-24:00 단위 내에 있는지 확인
+  const isCurrentTimeInRange = () => {
+    const hour = currentTime.getHours();
+    return hour >= 8 && hour < 24;
   };
 
   // 현재 시간 포맷
@@ -175,7 +186,7 @@ export default function ScheduleCalendar() {
     return `${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')}`;
   };
 
-  // 주 표시 (예: 3월 8-14주)
+  // 주 표시 (예: 3월 17-23일)
   const getWeekDisplay = () => {
     const startD = new Date(weekDates[0]);
     const endD = new Date(weekDates[6]);
@@ -185,9 +196,9 @@ export default function ScheduleCalendar() {
     const endDate = endD.getDate();
     
     if (startMonth === endMonth) {
-      return `${startMonth}월 ${startDate}-${endDate}주`;
+      return `${startMonth}월 ${startDate}-${endDate}일`;
     } else {
-      return `${startMonth}월 ${startDate}-${endMonth}월 ${endDate}주`;
+      return `${startMonth}월 ${startDate}-${endMonth}월 ${endDate}일`;
     }
   };
 
@@ -482,8 +493,8 @@ export default function ScheduleCalendar() {
               </div>
             ))}
 
-            {/* 현재 시간 표시 (빨간 선) - 오늘 날짜에만 */}
-            {weekDates.includes(today()) && (
+            {/* 현재 시간 표시 (빠른 선) - 오늘 날짜에만 그리고 08:00-24:00 단위에만 */}
+            {weekDates.includes(today()) && isCurrentTimeInRange() && (
               <div
                 className="absolute left-0 right-0 border-t-2 border-red-500 z-20 pointer-events-none"
                 style={{ top: `${getCurrentTimePosition()}px` }}

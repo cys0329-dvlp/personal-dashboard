@@ -42,7 +42,6 @@ export interface Task {
   completed: boolean;
   category?: string;
   detail?: string;
-  priority?: 'low' | 'medium' | 'high';
   showInCalendar?: boolean; // 캘린더에 표시할지 여부
   createdAt: string;
 }

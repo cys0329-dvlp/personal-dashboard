@@ -17,7 +17,8 @@ export default function TodoCalendar() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
-    priority: 'medium' as const,
+    startDate: '',
+    endDate: '',
   });
 
   const todayStr = today();
@@ -59,30 +60,31 @@ export default function TodoCalendar() {
   };
 
   const handleAddTask = () => {
-    if (!formData.title || !selectedDate) {
-      alert('제목과 날짜를 선택해주세요');
+    if (!formData.title) {
+      alert('할 일 제목을 입력해주세요');
       return;
     }
 
+    const startDate = formData.startDate || selectedDate;
+    if (!startDate) {
+      alert('시작일을 선택해주세요');
+      return;
+    }
+
+    // 기간이 지정된 경우 종료일, 미지정 시 시작일만 사용
+    const endDate = formData.endDate || startDate;
+
     addTask({
       title: formData.title,
-      dueDate: selectedDate,
-      priority: formData.priority,
+      dueDate: startDate,
+      dueTime: undefined,
       completed: false,
       projectId: undefined,
+      detail: `${startDate}부터 ${endDate}까지`,
     });
 
-    setFormData({ title: '', priority: 'medium' });
+    setFormData({ title: '', startDate: '', endDate: '' });
     setShowAddForm(false);
-  };
-
-  const getPriorityColor = (priority?: string) => {
-    switch (priority) {
-      case 'high': return 'text-red-600 bg-red-50';
-      case 'medium': return 'text-yellow-600 bg-yellow-50';
-      case 'low': return 'text-green-600 bg-green-50';
-      default: return 'text-gray-600 bg-gray-50';
-    }
   };
 
   const cells = [];
@@ -118,7 +120,7 @@ export default function TodoCalendar() {
               {dayTasks.slice(0, 2).map((task, idx) => (
                 <div
                   key={idx}
-                  className={`text-xs px-1 py-0.5 rounded truncate ${getPriorityColor(task.priority || 'medium')}`}
+                  className="text-xs px-1 py-0.5 rounded truncate bg-emerald-100 text-emerald-700"
                   title={task.title}
                 >
                   {task.completed ? '✓' : '○'} {task.title}
@@ -189,15 +191,28 @@ export default function TodoCalendar() {
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
               />
-              <select
-                value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
-                className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-              >
-                <option value="low">낮음</option>
-                <option value="medium">중간</option>
-                <option value="high">높음</option>
-              </select>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 block mb-1">시작일</label>
+                  <input
+                    type="date"
+                    value={formData.startDate}
+                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 block mb-1">종료일</label>
+                  <input
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                  />
+                </div>
+              </div>
+
               <div className="flex gap-2">
                 <button
                   onClick={handleAddTask}
@@ -223,7 +238,7 @@ export default function TodoCalendar() {
               {tasksByDate[selectedDate]?.map(task => (
                 <div
                   key={task.id}
-                  className={`flex items-center gap-2 p-2 bg-white rounded border-l-4 ${getPriorityColor(task.priority || 'medium')}`}
+                  className="flex items-center gap-2 p-2 bg-white rounded border-l-4 border-emerald-400"
                 >
                   <button
                     onClick={() => toggleTask(task.id)}
@@ -239,6 +254,9 @@ export default function TodoCalendar() {
                     <div className={`font-semibold ${task.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>
                       {task.title}
                     </div>
+                    {task.detail && (
+                      <div className="text-xs text-gray-500">{task.detail}</div>
+                    )}
                   </div>
                   <button
                     onClick={() => deleteTask(task.id)}
