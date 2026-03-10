@@ -1,8 +1,3 @@
-// Todo Calendar - 할 일 캘린더
-// 프로젝트 할 일 + 임의 추가 할 일 표시
-// 기간 기반 할 일은 캘린더 그리드 내에 가로 바로 표시
-// ============================================================
-
 import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Trash2, CheckCircle2, Circle } from 'lucide-react';
 import { useDashboard } from '@/contexts/DashboardContext';
@@ -66,52 +61,37 @@ export default function TodoCalendar() {
     return { rangedTasks: ranged, singleDateTasks: single };
   }, [tasks]);
 
-  // 현재 월에 표시될 기간 할 일 필터링
-  const visibleRangedTasks = useMemo(() => {
+  // 특정 날짜에 표시될 기간 할 일 찾기
+  const getRangedTasksForDay = (day: number) => {
+    const date = dateStr(day);
     const monthStart = dateStr(1);
     const monthEnd = dateStr(daysInMonth);
 
     return rangedTasks.filter(task => {
-      const taskStart = task.startDate;
-      const taskEnd = task.endDate;
-      // 현재 월과 겹치는 기간만 표시
-      return taskStart <= monthEnd && taskEnd >= monthStart;
+      return task.startDate <= date && task.endDate >= date;
     });
-  }, [rangedTasks, viewYear, viewMonth, daysInMonth]);
+  };
 
-  // 기간 할 일의 시작 위치 계산 (0-6, 요일 기준)
-  const getTaskStartCol = (startDate: string) => {
-    const taskDate = new Date(startDate);
-    const monthStart = new Date(dateStr(1));
-    
-    // 월의 첫 날이 어느 요일인지 확인
-    const firstDayOfWeek = firstDay;
-    
-    // 기간 할 일의 시작일이 이번 달인지 확인
-    if (startDate < dateStr(1)) {
-      // 지난 달에서 시작하는 경우, 월의 첫 날부터 시작
-      return 0;
-    }
-    
-    const dayOfMonth = parseInt(startDate.split('-')[2]);
-    return (firstDayOfWeek + dayOfMonth - 1) % 7;
+  // 기간 할 일이 이 날짜에서 시작하는지 확인
+  const isRangedTaskStart = (task: any, day: number) => {
+    return task.startDate === dateStr(day);
   };
 
   // 기간 할 일의 너비 계산 (칸 수)
-  const getTaskWidth = (startDate: string, endDate: string) => {
+  const getRangedTaskWidth = (task: any, day: number) => {
     const monthStart = dateStr(1);
     const monthEnd = dateStr(daysInMonth);
     
-    // 현재 월 범위 내에서의 시작일과 종료일
-    const actualStart = startDate < monthStart ? monthStart : startDate;
-    const actualEnd = endDate > monthEnd ? monthEnd : endDate;
+    const taskStart = task.startDate;
+    const taskEnd = task.endDate;
     
-    return getDaysBetween(actualStart, actualEnd);
-  };
-
-  // 기간 할 일이 어느 행에 표시될지 결정
-  const getTaskRow = (taskIndex: number) => {
-    return Math.floor(taskIndex / 2); // 한 행에 최대 2개 기간 할 일
+    // 이 날짜가 기간 할 일의 시작인 경우
+    if (isRangedTaskStart(task, day)) {
+      const actualEnd = taskEnd > monthEnd ? monthEnd : taskEnd;
+      return getDaysBetween(dateStr(day), actualEnd);
+    }
+    
+    return 0;
   };
 
   const prevMonth = () => {
@@ -164,13 +144,14 @@ export default function TodoCalendar() {
   const cells = [];
   // 이전 달 빈 칸
   for (let i = 0; i < firstDay; i++) {
-    cells.push(<div key={`empty-${i}`} className="bg-gray-50 p-2 min-h-24"></div>);
+    cells.push(<div key={`empty-${i}`} className="bg-gray-50 p-2 min-h-32"></div>);
   }
   // 현재 달 날짜
   for (let day = 1; day <= daysInMonth; day++) {
     const date = dateStr(day);
     const isToday = date === todayStr;
     const dayTasks = singleDateTasks[date] || [];
+    const rangedTasksForDay = getRangedTasksForDay(day);
     const completedCount = dayTasks.filter(t => t.completed).length;
 
     cells.push(
@@ -178,13 +159,34 @@ export default function TodoCalendar() {
         key={day}
         onClick={() => setSelectedDate(date)}
         className={cn(
-          'p-2 border rounded cursor-pointer transition-all min-h-24 relative',
+          'p-2 border rounded cursor-pointer transition-all min-h-32 relative',
           isToday ? 'bg-green-100 border-green-400 font-semibold' : 'bg-white border-gray-200 hover:bg-gray-50',
           selectedDate === date ? 'ring-2 ring-emerald-500' : ''
         )}
       >
         <div className="text-sm font-semibold text-gray-700 mb-1">{day}</div>
         
+        {/* 기간 할 일 표시 */}
+        <div className="space-y-1 mb-2">
+          {rangedTasksForDay.map((task, idx) => {
+            if (isRangedTaskStart(task, day)) {
+              const width = getRangedTaskWidth(task, day);
+              return (
+                <div
+                  key={`ranged-${idx}`}
+                  className="text-xs px-2 py-1 rounded bg-pink-200 text-pink-800 truncate"
+                  title={task.title}
+                  style={{ gridColumn: `span ${Math.min(width, 7)}` }}
+                >
+                  {task.title}
+                </div>
+              );
+            }
+            return null;
+          })}
+        </div>
+        
+        {/* 단일 날짜 할 일 표시 */}
         {dayTasks.length > 0 && (
           <div className="space-y-1">
             <div className="text-xs text-gray-600">
@@ -211,7 +213,7 @@ export default function TodoCalendar() {
   }
 
   return (
-    <div>
+    <div className="p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded">
@@ -234,155 +236,61 @@ export default function TodoCalendar() {
         ))}
       </div>
 
-      {/* Calendar grid with ranged tasks */}
-      <div className="space-y-2">
-        {/* Ranged tasks rows */}
-        {visibleRangedTasks.length > 0 && (
-          <div className="space-y-1">
-            {visibleRangedTasks.map((task, idx) => {
-              const startCol = getTaskStartCol(task.startDate);
-              const width = getTaskWidth(task.startDate, task.endDate);
-              
-              return (
-                <div
-                  key={`ranged-${idx}`}
-                  className="grid grid-cols-7 gap-1 h-8"
-                >
-                  {/* 시작 전 빈 칸 */}
-                  {Array.from({ length: startCol }).map((_, i) => (
-                    <div key={`spacer-${i}`}></div>
-                  ))}
-                  
-                  {/* 기간 바 */}
-                  <div
-                    className={cn(
-                      'col-span-1 rounded px-2 py-1 text-xs font-semibold text-white truncate flex items-center',
-                      task.completed ? 'bg-gray-400 opacity-60' : 'bg-pink-300 hover:bg-pink-400'
-                    )}
-                    style={{
-                      gridColumn: `span ${Math.min(width, 7 - startCol)}`,
-                    }}
-                    title={`${task.title} (${task.startDate} ~ ${task.endDate})`}
-                  >
-                    {task.completed ? '✓' : '○'} {task.title}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Calendar grid */}
-        <div className="grid grid-cols-7 gap-1 mb-6">
-          {cells}
-        </div>
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 gap-1 mb-6">
+        {cells}
       </div>
 
-      {/* Selected date details */}
-      {selectedDate && (
-        <div className="bg-gradient-to-r from-emerald-50 to-green-50 p-4 rounded-lg border border-emerald-200">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-emerald-900">
-              {selectedDate} 할 일
-            </h3>
+      {/* Add task form */}
+      {showAddForm && (
+        <div className="bg-white border rounded-lg p-4 mb-4">
+          <h3 className="font-semibold mb-3">할 일 추가</h3>
+          <input
+            type="text"
+            placeholder="할 일 제목"
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            className="w-full border rounded px-3 py-2 mb-2"
+          />
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <input
+              type="date"
+              value={formData.startDate}
+              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+              className="border rounded px-3 py-2"
+            />
+            <input
+              type="date"
+              value={formData.endDate}
+              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+              className="border rounded px-3 py-2"
+            />
+          </div>
+          <div className="flex gap-2">
             <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="flex items-center gap-1 px-3 py-1 bg-emerald-500 text-white rounded text-sm hover:bg-emerald-600"
+              onClick={handleAddTask}
+              className="flex-1 bg-emerald-600 text-white rounded px-3 py-2 hover:bg-emerald-700"
             >
-              <Plus className="w-4 h-4" />
               추가
             </button>
+            <button
+              onClick={() => setShowAddForm(false)}
+              className="flex-1 bg-gray-300 text-gray-700 rounded px-3 py-2 hover:bg-gray-400"
+            >
+              취소
+            </button>
           </div>
-
-          {/* Add Form */}
-          {showAddForm && (
-            <div className="bg-white p-3 rounded border border-emerald-200 mb-3 space-y-2">
-              <input
-                type="text"
-                placeholder="할 일 입력"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-              />
-              
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-xs font-semibold text-gray-700 block mb-1">시작일</label>
-                  <input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-700 block mb-1">종료일</label>
-                  <input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={handleAddTask}
-                  className="flex-1 px-3 py-1 bg-emerald-500 text-white rounded text-sm hover:bg-emerald-600"
-                >
-                  저장
-                </button>
-                <button
-                  onClick={() => setShowAddForm(false)}
-                  className="flex-1 px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
-                >
-                  취소
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Task List */}
-          {(singleDateTasks[selectedDate]?.length === 0) ? (
-            <p className="text-gray-500 text-sm">이 날짜에 할 일이 없습니다.</p>
-          ) : (
-            <div className="space-y-2">
-              {singleDateTasks[selectedDate]?.map(task => (
-                <div
-                  key={task.id}
-                  className="flex items-center gap-2 p-2 bg-white rounded border-l-4 border-emerald-400"
-                >
-                  <button
-                    onClick={() => toggleTask(task.id)}
-                    className="flex-shrink-0"
-                  >
-                    {task.completed ? (
-                      <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    ) : (
-                      <Circle className="w-5 h-5 text-gray-400" />
-                    )}
-                  </button>
-                  <div className="flex-1">
-                    <div className={`font-semibold ${task.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>
-                      {task.title}
-                    </div>
-                    {task.detail && (
-                      <div className="text-xs text-gray-500">{task.detail}</div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => deleteTask(task.id)}
-                    className="p-1 text-red-500 hover:bg-red-50 rounded"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
+
+      {/* Add button */}
+      <button
+        onClick={() => setShowAddForm(!showAddForm)}
+        className="flex items-center gap-2 bg-emerald-600 text-white rounded px-4 py-2 hover:bg-emerald-700"
+      >
+        <Plus className="w-5 h-5" />
+        할 일 추가
+      </button>
     </div>
   );
 }
