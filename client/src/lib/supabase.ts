@@ -166,7 +166,7 @@ export async function logoutAccount() {
 }
 
 // 사용자 데이터 저장
-export async function saveUserData(userId: string, dataType: 'project' | 'lecture' | 'finance' | 'task', data: Record<string, unknown>) {
+export async function saveUserData(userId: string, dataType: string, data: any) {
   try {
     const client = getSupabaseClient();
     
@@ -191,7 +191,7 @@ export async function saveUserData(userId: string, dataType: 'project' | 'lectur
 }
 
 // 사용자 데이터 조회
-export async function getUserData(userId: string, dataType?: 'project' | 'lecture' | 'finance' | 'task') {
+export async function getUserData(userId: string, dataType?: string) {
   try {
     const client = getSupabaseClient();
     

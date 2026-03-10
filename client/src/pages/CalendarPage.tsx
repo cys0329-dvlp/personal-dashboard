@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { useDashboard } from '@/contexts/DashboardContext';
+import { useSupabaseSync } from '@/hooks/useSupabaseSync';
 import FinanceCalendar from '@/components/calendars/FinanceCalendar';
 import ScheduleCalendar from '@/components/calendars/ScheduleCalendar';
 import TodoCalendar from '@/components/calendars/TodoCalendar';
@@ -12,6 +13,9 @@ import TodoCalendar from '@/components/calendars/TodoCalendar';
 type CalendarType = 'finance' | 'schedule' | 'todo';
 
 export default function CalendarPage() {
+  // Enable Supabase synchronization
+  useSupabaseSync();
+  
   const [activeCalendar, setActiveCalendar] = useState<CalendarType>('finance');
 
   const calendarTabs = [

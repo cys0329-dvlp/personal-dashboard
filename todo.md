@@ -142,3 +142,39 @@
 - [x] 네모 칬(셀) 위에 단순 표시 - 완료
 - [x] 겹침 처리 및 레이아웃 최적화 - 완료
 - [x] 테스트 및 검증 - 완료
+
+
+## Phase 8: Supabase 회원가입/로그인 및 크로스 디바이스 동기화 (신규)
+
+### Phase 8-1: Supabase 프로젝트 설정
+- [ ] Supabase 프로젝트 생성 및 API 키 설정
+- [ ] 데이터베이스 스키마 설계 (users, tasks, schedules, finances)
+- [ ] 행 수준 보안(RLS) 정책 설정
+- [ ] Realtime 활성화
+
+### Phase 8-2: 회원가입/로그인 UI 및 인증 ✅
+- [x] 회원가입 페이지 구현 (SignUpPage.tsx)
+- [x] 로그인 페이지 구현 (LoginPage.tsx)
+- [x] 인증 상태 관리 (AuthContext.tsx)
+- [x] 보호된 라우트 설정 (App.tsx)
+
+### Phase 8-3: 데이터 마이그레이션 및 동기화 ✅
+- [x] 기존 로컬 데이터를 Supabase로 마이그레이션 (migrateDataFromLocalStorage)
+- [x] useSupabaseSync 훅으로 DashboardContext와 연동
+- [x] 사용자별 데이터 격리 (userId 기반)
+- [x] 500ms 디바운싱으로 성능 최적화
+
+### Phase 8-4: 실시간 동기화 (Realtime)
+- [ ] Supabase Realtime 구독 설정
+- [ ] 다중 디바이스 실시간 업데이트
+- [ ] 충돌 해결 로직
+
+### Phase 8-5: 크로스 디바이스 테스트
+- [ ] 노트북에서 데이터 추가 → 패드에서 확인
+- [ ] 패드에서 데이터 수정 → 노트북에서 확인
+- [ ] 오프라인 모드 처리
+
+### Phase 8-6: 최종 검증 및 배포
+- [ ] 보안 감사 (RLS, API 키)
+- [ ] 성능 최적화
+- [ ] 배포 및 모니터링
