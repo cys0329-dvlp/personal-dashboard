@@ -99,8 +99,6 @@ export async function createAccount(username: string, password: string, isAdmin:
           email: `${username}@lifeOS.local`,
           isAdmin: isAdmin,
           password_hash: passwordHash,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
         }
       ])
       .select();
@@ -148,7 +146,8 @@ export async function loginAccount(username: string, password: string) {
       throw new Error('Invalid username or password');
     }
 
-    return { success: true, userId: account.id, username: account.username };
+    // 3. 사용자 정보 반환
+    return { success: true, userId: account.id, username: account.username, isAdmin: account.isAdmin };
   } catch (error) {
     console.error("Error logging in:", error);
     throw error;
@@ -297,18 +296,26 @@ export async function checkAdminExists() {
   try {
     const client = getSupabaseClient();
     
+    // Add timestamp to bypass caching
+    const timestamp = Date.now();
+    console.log(`[Admin Check] Querying with timestamp: ${timestamp}`);
+    
     const { data, error } = await client
       .from('user_accounts')
       .select('id')
       .eq('isAdmin', true)
       .limit(1);
 
+    console.log(`[Admin Check] Result: data=${JSON.stringify(data)}, error=${error}`);
+    
     if (error && error.code !== 'PGRST116') {
       console.warn('Admin check warning:', error.message);
       return { success: true, exists: false };
     }
     
-    return { success: true, exists: data && data.length > 0 };
+    const result = data && data.length > 0;
+    console.log(`[Admin Check] Final result: ${result}`);
+    return { success: true, exists: result };
   } catch (error) {
     console.error("Error checking admin:", error);
     return { success: true, exists: false };

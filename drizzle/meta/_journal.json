@@ -36,6 +36,13 @@
       "when": 1772775697046,
       "tag": "0004_opposite_cobalt_man",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1773605808918,
+      "tag": "0005_classy_rattler",
+      "breakpoints": true
     }
   ]
 }

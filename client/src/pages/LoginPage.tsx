@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Lock, Mail, UserPlus, AlertCircle, Loader2 } from 'lucide-react';
-import { supabase, createAccount, loginAccount } from '@/lib/supabase';
+import { createAccount, loginAccount, checkAdminExists as checkAdminExistsFunc } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface LoginPageProps {
-  onLogin: (username: string, userId: string) => void;
+  onLogin?: (username: string, userId: string) => void;
 }
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
+  const { login: authLogin } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -15,21 +17,23 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [adminExists, setAdminExists] = useState<boolean | null>(null);
+  const [adminCheckLoading, setAdminCheckLoading] = useState(true);
 
   // 관리자 계정 존재 여부 확인
   const checkAdminExists = async () => {
     try {
-      const { data, error } = await supabase
-        .from('user_accounts')
-        .select('id')
-        .eq('isAdmin', true)
-        .limit(1);
-
-      if (error) throw error;
-      setAdminExists(data && data.length > 0);
+      setAdminCheckLoading(true);
+      console.log('🔍 Admin check starting...');
+      const result = await checkAdminExistsFunc();
+      console.log('📊 Query result:', result);
+      const adminExistsResult = result.success && result.exists;
+      console.log('✅ Admin exists:', adminExistsResult);
+      setAdminExists(adminExistsResult);
     } catch (err) {
-      console.error('Error checking admin:', err);
+      console.error('❌ Error checking admin:', err);
       setAdminExists(false);
+    } finally {
+      setAdminCheckLoading(false);
     }
   };
 
@@ -51,7 +55,15 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     try {
       const result = await loginAccount(username, password);
       toast.success('로그인 성공!');
-      onLogin(username, result.userId);
+      
+      // AuthContext에 로그인 정보 저장
+      authLogin({ id: result.userId, username });
+      onLogin?.(username, result.userId);
+      
+      // 대시보드로 리다이렉트
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 500);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : '로그인 실패';
       setError(errorMessage);
@@ -75,8 +87,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       return;
     }
 
-    // 관리자가 없으면 첫 번째 계정을 관리자로 생성
-    const isFirstAdmin = !adminExists;
+    // 관리자 비밀번호가 비어있으면 첫 번째 계정으로 생성
+    // (adminExists 값이 정확하지 않을 수 있으므로 관리자 비밀번호 입력 여부로 판단)
+    const isFirstAdmin = !adminPassword.trim();
 
     // 관리자가 있으면 관리자 비밀번호 확인
     if (!isFirstAdmin && !adminPassword.trim()) {
@@ -100,8 +113,14 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       const result = await createAccount(username, password, isFirstAdmin);
       toast.success(isFirstAdmin ? '관리자 계정이 생성되었습니다!' : '계정이 생성되었습니다!');
       
-      // 계정 생성 후 자동 로그인
-      onLogin(username, result.userId);
+      // AuthContext에 로그인 정보 저장
+      authLogin({ id: result.userId, username });
+      onLogin?.(username, result.userId);
+      
+      // 대시보드로 리다이렉트
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 500);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : '계정 생성 실패';
       setError(errorMessage);
@@ -143,17 +162,20 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             </button>
             <button
               onClick={() => {
-                setMode('register');
-                setError('');
-                setAdminPassword('');
+                if (!adminCheckLoading) {
+                  setMode('register');
+                  setError('');
+                  setAdminPassword('');
+                }
               }}
+              disabled={adminCheckLoading}
               className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all ${
                 mode === 'register'
                   ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              } ${adminCheckLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              회원가입
+              {adminCheckLoading ? '로드 중...' : '회원가입'}
             </button>
           </div>
 

@@ -1,0 +1,9 @@
+{
+  "query": "SELECT id, username, email, isAdmin FROM user_accounts;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user DCEy53khShH4CTF.root --database Uuc98AdMPub5tEMfmpprzc --execute SELECT id, username, email, isAdmin FROM user_accounts;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1664
+}

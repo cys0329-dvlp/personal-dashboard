@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, longtext } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, longtext, tinyint } from "drizzle-orm/mysql-core";
 import { relations } from "drizzle-orm";
 
 /**
@@ -99,7 +99,22 @@ export const customCategories = mysqlTable("customCategories", {
 export type CustomCategory = typeof customCategories.$inferSelect;
 export type InsertCustomCategory = typeof customCategories.$inferInsert;
 
+/**
+ * User accounts table for local authentication
+ * Used for username/password login (Supabase)
+ */
+export const userAccounts = mysqlTable("user_accounts", {
+  id: int("id").autoincrement().primaryKey(),
+  username: varchar("username", { length: 255 }).notNull().unique(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  password_hash: varchar("password_hash", { length: 255 }).notNull(),
+  isAdmin: tinyint("isAdmin").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
 
+export type UserAccount = typeof userAccounts.$inferSelect;
+export type InsertUserAccount = typeof userAccounts.$inferInsert;
 
 // Relations
 export const lecturesRelations = relations(lectures, ({ many, one }) => ({
